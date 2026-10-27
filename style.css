@@ -279,3 +279,89 @@
     opacity: 0.45;
     cursor: not-allowed;
 }
+
+/* --- Вкладка «Источники» --- */
+
+.rlw-src-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 10px;
+}
+
+.rlw-src-item,
+.rlw-lore-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 4px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.rlw-src-item:hover,
+.rlw-lore-item:hover {
+    background-color: var(--SmartThemeBotMesBlurTintColor);
+}
+
+.rlw-src-item input,
+.rlw-lore-item input {
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.rlw-src-name,
+.rlw-lore-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.rlw-lore-search {
+    margin: 0 0 2px 0;
+}
+
+.rlw-lore-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    max-height: 340px;
+    overflow-y: auto;
+    padding-right: 2px;
+}
+
+.rlw-lore-item--active .rlw-lore-name {
+    font-weight: 600;
+}
+
+.rlw-pill {
+    flex-shrink: 0;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 0.78em;
+    white-space: nowrap;
+    background-color: color-mix(in srgb, var(--SmartThemeQuoteColor) 30%, transparent);
+    border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor) 60%, transparent);
+}
+
+.rlw-lore-divider {
+    margin: 8px 4px 2px 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--SmartThemeBorderColor);
+    font-size: 0.82em;
+    opacity: 0.6;
+}
+
+.rlw-lore-counter {
+    margin-top: 4px;
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+.rlw-lore-counter--over {
+    opacity: 1;
+    color: var(--warning, #e8a33d);
+    font-weight: 600;
+}

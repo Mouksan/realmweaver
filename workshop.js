@@ -3,14 +3,14 @@
 // Сверху: строка статуса (что действует в этом чате), выбор пакета из
 // библиотеки, блок «Где действует» и выключатель на чат.
 // Ниже три вкладки: Параметры / Источники / Пакет.
-// На этапах 1–2 живая только вкладка «Пакет» — тексты пишутся руками.
-// «Параметры» появятся на этапе 4, «Источники» — на этапе 3.
+// «Параметры» появятся на этапе 4 вместе с генерацией.
 //
 // Окно — штатный Popup таверны, тот же механизм, что в Plotweaver.
 
 import {
     ctx,
     getSettings,
+    saveSettings,
     hasChat,
     isGroupChat,
     currentCharacter,
@@ -28,6 +28,20 @@ import {
     resolveActive,
 } from './store.js';
 import { applyInjection } from './inject.js';
+import {
+    ACTIVE_KIND_LABELS,
+    countTokens,
+    countLorebookTokens,
+    resetLoreTokenCache,
+    getLorebookList,
+    resolveLoreSelection,
+    storeLoreSelection,
+    getSourceFlags,
+    defaultSourceFlags,
+    getCardText,
+    getFirstMessageText,
+    getPersonaText,
+} from './sources.js';
 
 const TOKEN_COUNT_DELAY = 400; // мс — не считаем токены на каждую букву
 
@@ -41,17 +55,6 @@ function escapeHtml(str) {
 
 function formatNumber(n) {
     return Number(n || 0).toLocaleString('ru-RU');
-}
-
-async function countTokens(text) {
-    const str = String(text || '');
-    if (!str.trim()) return 0;
-    try {
-        return await ctx().getTokenCountAsync(str);
-    } catch {
-        // Подстраховка, если токенайзер недоступен: грубо — 1 токен на ~3.5 символа.
-        return Math.ceil(str.length / 3.5);
-    }
 }
 
 async function confirmPopup(text, okText, cancelText) {
@@ -128,7 +131,31 @@ function dialogHtml() {
             </div>
 
             <div class="rlw-tab-panel" data-tab="sources">
-                <div class="rlw-stub">Карточка, персона и лорбуки появятся на этапе 3.</div>
+                <div class="rlw-src-group">
+                    <div class="rlw-label">Карточка и персона</div>
+                    <label class="rlw-src-item">
+                        <input type="checkbox" class="rlw-src-flag" data-flag="card">
+                        <span class="rlw-src-name">Карточка персонажа (описание, личность, сценарий)</span>
+                        <span class="rlw-tokens" data-src="card"></span>
+                    </label>
+                    <label class="rlw-src-item">
+                        <input type="checkbox" class="rlw-src-flag" data-flag="firstMes">
+                        <span class="rlw-src-name">Первое сообщение</span>
+                        <span class="rlw-tokens" data-src="firstMes"></span>
+                    </label>
+                    <label class="rlw-src-item">
+                        <input type="checkbox" class="rlw-src-flag" data-flag="persona">
+                        <span class="rlw-src-name">Персона (описание персоны)</span>
+                        <span class="rlw-tokens" data-src="persona"></span>
+                    </label>
+                </div>
+
+                <div class="rlw-src-group">
+                    <div class="rlw-label">Лорбуки</div>
+                    <input type="search" class="text_pole rlw-lore-search" placeholder="Поиск лорбука…">
+                    <div class="rlw-lore-list"></div>
+                    <div class="rlw-lore-counter"></div>
+                </div>
             </div>
 
             <div class="rlw-tab-panel" data-tab="package">
@@ -177,6 +204,9 @@ export async function openWorkshop() {
         toastr.info('Открой чат — мастерской нужен чат, к которому привязывать мир.', 'Realmweaver');
         return;
     }
+
+    // Лорбуки могли поменяться с прошлого открытия — вес считаем заново.
+    resetLoreTokenCache();
 
     const root = document.createElement('div');
     root.classList.add('rlw-dialog');
@@ -278,6 +308,106 @@ export async function openWorkshop() {
         refreshDirtyButtons();
     };
 
+    // --- Вкладка «Источники» ------------------------------------------------
+
+    // Список лорбуков, нарисованный сейчас: [{ name, activeKind }]. Чекбоксы
+    // ссылаются на него по индексу — так не нужно экранировать имена с
+    // кавычками в селекторах.
+    let loreItems = [];
+    // Для какого пакета вкладка уже нарисована — чтобы не перерисовывать
+    // (и не перечитывать лорбуки) на каждом переключении вкладок.
+    let sourcesRenderedFor = null;
+    let counterRun = 0;
+
+    const loreTokensText = (count) => `≈ ${formatNumber(count)}`;
+
+    const checkedLoreNames = () => $root.find('.rlw-lore-check:checked')
+        .map(function () { return loreItems[Number($(this).data('idx'))]?.name; })
+        .get()
+        .filter(Boolean);
+
+    /** Подпись под списком: сколько токенов весят отмеченные лорбуки. */
+    const refreshLoreCounter = async () => {
+        const run = ++counterRun;
+        const limit = getSettings().loreTokenLimit;
+        const names = checkedLoreNames();
+        const $counter = $root.find('.rlw-lore-counter');
+        if (!names.length) {
+            $counter.text(`Выбрано: 0 токенов из ${formatNumber(limit)}`).removeClass('rlw-lore-counter--over');
+            return;
+        }
+        $counter.text('Выбрано: считаю…').removeClass('rlw-lore-counter--over');
+        const counts = await Promise.all(names.map((name) => countLorebookTokens(name)));
+        if (run !== counterRun) return; // пока считали, галочки уже поменяли
+        const total = counts.reduce((sum, n) => sum + n, 0);
+        const over = total > limit;
+        $counter
+            .text(`Выбрано: ≈${formatNumber(total)} токенов из ${formatNumber(limit)}${over ? ' — лишнее отрежется' : ''}`)
+            .toggleClass('rlw-lore-counter--over', over);
+    };
+
+    /** Вес лорбука рядом с его именем — считаем только для отмеченных. */
+    const refreshLoreItemTokens = (idx) => {
+        const item = loreItems[idx];
+        if (!item) return;
+        countLorebookTokens(item.name).then((count) => {
+            $root.find(`.rlw-tokens[data-lore-idx="${idx}"]`).text(loreTokensText(count));
+        });
+    };
+
+    const renderSources = () => {
+        const pkg = getPackage(selectedId);
+        if (!pkg) return;
+        sourcesRenderedFor = selectedId;
+
+        // Галочки карточки/первого сообщения/персоны и их вес.
+        const flags = getSourceFlags(pkg);
+        const texts = { card: getCardText(), firstMes: getFirstMessageText(), persona: getPersonaText() };
+        for (const flag of Object.keys(texts)) {
+            $root.find(`.rlw-src-flag[data-flag="${flag}"]`).prop('checked', flags[flag]);
+            const $tokens = $root.find(`.rlw-tokens[data-src="${flag}"]`);
+            if (!texts[flag]) {
+                $tokens.text('пусто');
+            } else {
+                countTokens(texts[flag]).then((count) => $tokens.text(loreTokensText(count)));
+            }
+        }
+
+        // Лорбуки: активные сверху, остальные ниже.
+        loreItems = getLorebookList();
+        const selected = resolveLoreSelection(pkg);
+        const $list = $root.find('.rlw-lore-list');
+        if (!loreItems.length) {
+            $list.html('<div class="rlw-hint">Лорбуков в таверне не найдено.</div>');
+        } else {
+            const hasActive = loreItems.some((item) => item.activeKind);
+            const hasRest = loreItems.some((item) => !item.activeKind);
+            let html = '';
+            loreItems.forEach((item, idx) => {
+                if (hasActive && hasRest && !item.activeKind && (idx === 0 || loreItems[idx - 1].activeKind)) {
+                    html += '<div class="rlw-lore-divider">Остальные лорбуки</div>';
+                }
+                const pill = item.activeKind
+                    ? `<span class="rlw-pill">активен в чате · ${ACTIVE_KIND_LABELS[item.activeKind]}</span>`
+                    : '';
+                html += `
+                    <label class="rlw-lore-item ${item.activeKind ? 'rlw-lore-item--active' : ''}" data-search="${escapeHtml(item.name.toLowerCase())}">
+                        <input type="checkbox" class="rlw-lore-check" data-idx="${idx}" ${selected.has(item.name) ? 'checked' : ''}>
+                        <span class="rlw-lore-name">${escapeHtml(item.name)}</span>
+                        ${pill}
+                        <span class="rlw-tokens" data-lore-idx="${idx}"></span>
+                    </label>
+                `;
+            });
+            $list.html(html);
+            loreItems.forEach((item, idx) => {
+                if (selected.has(item.name)) refreshLoreItemTokens(idx);
+            });
+        }
+        $root.find('.rlw-lore-search').val('');
+        refreshLoreCounter();
+    };
+
     const renderTabs = () => {
         $root.find('.rlw-tab').each(function () {
             $(this).attr('aria-pressed', String($(this).data('tab') === activeTab));
@@ -285,9 +415,12 @@ export async function openWorkshop() {
         $root.find('.rlw-tab-panel').each(function () {
             $(this).toggleClass('rlw-tab-panel--active', $(this).data('tab') === activeTab);
         });
+        // Источники рисуем лениво — только когда на них смотрят.
+        if (activeTab === 'sources' && sourcesRenderedFor !== selectedId) renderSources();
     };
 
     const renderAll = () => {
+        sourcesRenderedFor = null;
         renderStatus();
         renderSelect();
         renderPlacement();
@@ -382,6 +515,30 @@ export async function openWorkshop() {
     $root.on('click', '.rlw-tab', function () {
         activeTab = String($(this).data('tab'));
         renderTabs();
+    });
+
+    $root.on('change', '.rlw-src-flag', function () {
+        const pkg = getPackage(selectedId);
+        if (!pkg) return;
+        pkg.sources = { ...defaultSourceFlags(), ...(pkg.sources || {}), [String($(this).data('flag'))]: $(this).prop('checked') };
+        saveSettings();
+    });
+
+    $root.on('change', '.rlw-lore-check', function () {
+        const pkg = getPackage(selectedId);
+        if (!pkg) return;
+        storeLoreSelection(pkg, checkedLoreNames());
+        saveSettings();
+        if ($(this).prop('checked')) refreshLoreItemTokens(Number($(this).data('idx')));
+        refreshLoreCounter();
+    });
+
+    $root.on('input', '.rlw-lore-search', function () {
+        const query = String($(this).val() || '').trim().toLowerCase();
+        $root.find('.rlw-lore-item').each(function () {
+            $(this).toggle(!query || String($(this).attr('data-search') || '').includes(query));
+        });
+        $root.find('.rlw-lore-divider').toggle(!query);
     });
 
     $root.on('input', '.rlw-text', function () {
