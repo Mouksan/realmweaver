@@ -27,6 +27,8 @@ const DEFAULTS = {
     responseTokens: 4000,
     loreTokenLimit: 30000,
     cheatDepth: 2,
+    // Свои общие правила для модели; пусто — берётся стандартный текст из prompt.js.
+    promptTemplate: '',
     packages: {},
     bindings: {},
     lastPackageId: '',

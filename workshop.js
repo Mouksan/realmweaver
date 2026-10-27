@@ -41,7 +41,23 @@ import {
     getCardText,
     getFirstMessageText,
     getPersonaText,
+    collectSources,
 } from './sources.js';
+import {
+    PARAMS,
+    LANGUAGES,
+    MODULES,
+    getParams,
+    getModules,
+    hasEnabledModules,
+    buildMessages,
+} from './prompt.js';
+import { requestCompletion, parsePackage, errorText, EmptyResponseError } from './generate.js';
+
+// Пакеты, которые генерируются прямо сейчас (id). Живёт вне окна: если
+// закрыть мастерскую посреди генерации, результат всё равно сохранится,
+// а при повторном открытии кнопка покажет, что работа идёт.
+const generatingIds = new Set();
 
 const TOKEN_COUNT_DELAY = 400; // мс — не считаем токены на каждую букву
 
@@ -79,6 +95,61 @@ async function inputPopup(text, defaultValue) {
 // ---------------------------------------------------------------------------
 // Вёрстка
 // ---------------------------------------------------------------------------
+
+/** Вкладка «Параметры»: списки, поля и модули — всё из описаний в prompt.js. */
+function paramsHtml() {
+    // extra — дополнительная разметка под списком (у архетипа это поле «Своё…»).
+    const selectHtml = (param, extra = '') => `
+        <div class="rlw-param">
+            <label class="rlw-param-label" for="rlw-param-${param.id}">${escapeHtml(param.label)}</label>
+            <select class="text_pole rlw-param-select" id="rlw-param-${param.id}" data-param="${param.id}">
+                ${param.options.map((o) => `<option value="${o.id}">${escapeHtml(o.label)}</option>`).join('')}
+            </select>
+            ${extra}
+        </div>`;
+    const byId = Object.fromEntries(PARAMS.map((p) => [p.id, p]));
+
+    return `
+        <div class="rlw-src-group">
+            <div class="rlw-label">Мир</div>
+            <div class="rlw-param-grid">
+                ${selectHtml(byId.archetype, `
+                    <input type="text" class="text_pole rlw-param-text rlw-param-custom" data-param="archetypeCustom"
+                        placeholder="Опиши сеттинг своими словами">`)}
+                ${selectHtml(byId.tech)}
+                ${selectHtml(byId.magic)}
+                ${selectHtml(byId.register)}
+            </div>
+            <div class="rlw-param">
+                <label class="rlw-param-label" for="rlw-param-analogue">Реальный аналог для фактуры</label>
+                <input type="text" class="text_pole rlw-param-text" id="rlw-param-analogue" data-param="analogue"
+                    placeholder="например: империя Сун, Византия, Венеция XV века">
+            </div>
+            <div class="rlw-param">
+                <div class="rlw-param-label">Язык ролевки</div>
+                <div class="rlw-segmented">
+                    ${LANGUAGES.map((l) => `<button type="button" class="rlw-seg" data-lang="${l.id}">${escapeHtml(l.label)}</button>`).join('')}
+                </div>
+            </div>
+            <div class="rlw-param">
+                <label class="rlw-param-label" for="rlw-param-wishes">Пожелания</label>
+                <textarea class="text_pole rlw-param-text" id="rlw-param-wishes" data-param="wishes" rows="3"
+                    placeholder="например: волки клянутся Луной, зайцы — Матерью-Полем"></textarea>
+            </div>
+        </div>
+
+        <div class="rlw-src-group">
+            <div class="rlw-label">Модули</div>
+            <div class="rlw-module-grid">
+                ${MODULES.map((m) => `
+                    <label class="rlw-src-item">
+                        <input type="checkbox" class="rlw-module" data-module="${m.id}">
+                        <span class="rlw-src-name">${escapeHtml(m.label)}</span>
+                    </label>`).join('')}
+            </div>
+        </div>
+    `;
+}
 
 function dialogHtml() {
     return `
@@ -127,7 +198,7 @@ function dialogHtml() {
             </div>
 
             <div class="rlw-tab-panel" data-tab="params">
-                <div class="rlw-stub">Параметры мира появятся на этапе 4 — вместе с генерацией.</div>
+                ${paramsHtml()}
             </div>
 
             <div class="rlw-tab-panel" data-tab="sources">
@@ -135,7 +206,7 @@ function dialogHtml() {
                     <div class="rlw-label">Карточка и персона</div>
                     <label class="rlw-src-item">
                         <input type="checkbox" class="rlw-src-flag" data-flag="card">
-                        <span class="rlw-src-name">Карточка персонажа (описание, личность, сценарий)</span>
+                        <span class="rlw-src-name">Карточка персонажа</span>
                         <span class="rlw-tokens" data-src="card"></span>
                     </label>
                     <label class="rlw-src-item">
@@ -145,7 +216,7 @@ function dialogHtml() {
                     </label>
                     <label class="rlw-src-item">
                         <input type="checkbox" class="rlw-src-flag" data-flag="persona">
-                        <span class="rlw-src-name">Персона (описание персоны)</span>
+                        <span class="rlw-src-name">Персона</span>
                         <span class="rlw-tokens" data-src="persona"></span>
                     </label>
                 </div>
@@ -154,14 +225,14 @@ function dialogHtml() {
                     <div class="rlw-label">Лорбуки</div>
                     <input type="search" class="text_pole rlw-lore-search" placeholder="Поиск лорбука…">
                     <div class="rlw-lore-list"></div>
-                    <div class="rlw-lore-counter"></div>
+                    <div class="rlw-lore-counter-bar"><div class="rlw-lore-counter"></div></div>
                 </div>
             </div>
 
             <div class="rlw-tab-panel" data-tab="package">
-                <button type="button" class="menu_button rlw-generate" disabled title="Генерация появится на этапе 4">
+                <button type="button" class="menu_button rlw-generate">
                     <i class="fa-solid fa-wand-magic-sparkles"></i>
-                    <span>Сгенерировать пакет</span>
+                    <span class="rlw-generate-label">Сгенерировать пакет</span>
                 </button>
 
                 <div class="rlw-field">
@@ -170,7 +241,7 @@ function dialogHtml() {
                         <span class="rlw-tokens" data-for="full"></span>
                     </div>
                     <textarea class="text_pole rlw-text" data-field="full" rows="14"
-                        placeholder="Здесь будет фактура мира. Пока можно вписать руками."></textarea>
+                        placeholder="Здесь будет фактура мира — сгенерируй её или впиши руками."></textarea>
                 </div>
 
                 <div class="rlw-field">
@@ -193,6 +264,77 @@ function dialogHtml() {
             </div>
         </div>
     `;
+}
+
+// ---------------------------------------------------------------------------
+// Генерация (живёт вне окна, чтобы пережить его закрытие)
+// ---------------------------------------------------------------------------
+
+// Открытые окна подписываются сюда, чтобы перерисоваться, когда генерация
+// началась или закончилась.
+const generationListeners = new Set();
+
+function notifyGeneration() {
+    for (const listener of generationListeners) {
+        try {
+            listener();
+        } catch (error) {
+            console.warn('[Realmweaver] ошибка при обновлении окна', error);
+        }
+    }
+}
+
+/** Проверки до генерации; если что-то не так — тост и false. */
+function canGenerate(pkg) {
+    if (!pkg) return false;
+    if (!getSettings().profileId) {
+        toastr.warning('Не выбран профиль подключения — загляни в настройки Realmweaver.', 'Realmweaver');
+        return false;
+    }
+    if (!hasEnabledModules(pkg)) {
+        toastr.warning('Включи хотя бы один модуль во вкладке «Параметры».', 'Realmweaver');
+        return false;
+    }
+    return true;
+}
+
+async function generatePackage(pkgId) {
+    const pkg = getPackage(pkgId);
+    if (!pkg || generatingIds.has(pkgId) || !canGenerate(pkg)) return;
+
+    generatingIds.add(pkgId);
+    notifyGeneration();
+    try {
+        // Фиксируем в пакете выбор лорбуков, с которым он генерировался.
+        storeLoreSelection(pkg, resolveLoreSelection(pkg));
+        saveSettings();
+
+        const { text } = await collectSources(pkg);
+        if (!text.trim()) {
+            toastr.warning('Источники пустые — отметь карточку, персону или лорбуки во вкладке «Источники».', 'Realmweaver');
+            return;
+        }
+
+        const raw = await requestCompletion(buildMessages(pkg, text));
+        const { full, cheat } = parsePackage(raw);
+
+        if (!getPackage(pkgId)) return; // пакет удалили, пока ждали ответа
+        updatePackageTexts(pkgId, { full, cheat });
+        applyInjection();
+
+        if (!cheat) toastr.warning('Шпаргалку модель не выдала — допиши руками или перегенерируй.', 'Realmweaver');
+        toastr.success(`Пакет «${getPackage(pkgId).name}» готов.`, 'Realmweaver');
+    } catch (error) {
+        if (error instanceof EmptyResponseError) {
+            toastr.error('Модель вернула что-то странное — пакет не сохранён. Попробуй ещё раз.', 'Realmweaver');
+        } else {
+            console.error('[Realmweaver] генерация не удалась', error);
+            toastr.error(`Генерация не удалась: ${errorText(error)}`, 'Realmweaver');
+        }
+    } finally {
+        generatingIds.delete(pkgId);
+        notifyGeneration();
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -306,6 +448,7 @@ export async function openWorkshop() {
         refreshTokens('full');
         refreshTokens('cheat');
         refreshDirtyButtons();
+        renderGenerateButton();
     };
 
     // --- Вкладка «Источники» ------------------------------------------------
@@ -419,13 +562,71 @@ export async function openWorkshop() {
         if (activeTab === 'sources' && sourcesRenderedFor !== selectedId) renderSources();
     };
 
+    // --- Вкладка «Параметры» -----------------------------------------------
+
+    const renderParams = () => {
+        const pkg = getPackage(selectedId);
+        if (!pkg) return;
+        const params = getParams(pkg);
+        const modules = getModules(pkg);
+        $root.find('.rlw-param-select').each(function () {
+            $(this).val(params[String($(this).data('param'))]);
+        });
+        $root.find('.rlw-param-text').each(function () {
+            $(this).val(params[String($(this).data('param'))] || '');
+        });
+        $root.find('.rlw-param-custom').toggle(params.archetype === 'custom');
+        $root.find('.rlw-seg').each(function () {
+            $(this).attr('aria-pressed', String($(this).data('lang') === params.language));
+        });
+        $root.find('.rlw-module').each(function () {
+            $(this).prop('checked', Boolean(modules[String($(this).data('module'))]));
+        });
+    };
+
+    const setParam = (key, value) => {
+        const pkg = getPackage(selectedId);
+        if (!pkg) return;
+        pkg.params = { ...getParams(pkg), [key]: value };
+        saveSettings();
+    };
+
+    // --- Кнопка генерации ----------------------------------------------------
+
+    // Пакет, генерацию которого это окно ждёт: когда она закончится,
+    // текстовые поля надо перерисовать готовым результатом.
+    let awaitedId = generatingIds.has(selectedId) ? selectedId : null;
+
+    const renderGenerateButton = () => {
+        const pkg = getPackage(selectedId);
+        const busy = generatingIds.has(selectedId);
+        const hasText = Boolean(pkg && (String(pkg.full || '').trim() || String(pkg.cheat || '').trim()));
+        const $button = $root.find('.rlw-generate');
+        $button.prop('disabled', busy || !pkg).toggleClass('rlw-generate--busy', busy);
+        $button.find('i').attr('class', busy ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-wand-magic-sparkles');
+        $button.find('.rlw-generate-label').text(busy ? 'Генерирую…' : (hasText ? 'Перегенерировать' : 'Сгенерировать пакет'));
+        // Пока идёт генерация, поля только для чтения — иначе правки затрёт результат.
+        $root.find('.rlw-text').prop('readonly', busy);
+    };
+
+    const onGenerationChange = () => {
+        if (awaitedId && !generatingIds.has(awaitedId)) {
+            if (awaitedId === selectedId) renderTexts();
+            awaitedId = null;
+        }
+        renderStatus();
+        renderGenerateButton();
+    };
+
     const renderAll = () => {
         sourcesRenderedFor = null;
         renderStatus();
         renderSelect();
         renderPlacement();
         renderTexts();
+        renderParams();
         renderTabs();
+        renderGenerateButton();
     };
 
     /** Что-то поменялось в привязках или текстах — перевешиваем инжект и статус. */
@@ -439,6 +640,7 @@ export async function openWorkshop() {
         updatePackageTexts(selectedId, { full: textValue('full'), cheat: textValue('cheat') });
         afterChange();
         refreshDirtyButtons();
+        renderGenerateButton();
     };
 
     /**
@@ -456,6 +658,7 @@ export async function openWorkshop() {
 
     const selectPackage = (id) => {
         selectedId = id || '';
+        awaitedId = generatingIds.has(selectedId) ? selectedId : null;
         if (selectedId) setLastPackage(selectedId);
         renderAll();
     };
@@ -541,6 +744,41 @@ export async function openWorkshop() {
         $root.find('.rlw-lore-divider').toggle(!query);
     });
 
+    $root.on('change', '.rlw-param-select', function () {
+        const key = String($(this).data('param'));
+        setParam(key, String($(this).val()));
+        if (key === 'archetype') $root.find('.rlw-param-custom').toggle($(this).val() === 'custom');
+    });
+
+    $root.on('input', '.rlw-param-text', function () {
+        setParam(String($(this).data('param')), String($(this).val() ?? ''));
+    });
+
+    $root.on('click', '.rlw-seg', function () {
+        setParam('language', String($(this).data('lang')));
+        renderParams();
+    });
+
+    $root.on('change', '.rlw-module', function () {
+        const pkg = getPackage(selectedId);
+        if (!pkg) return;
+        pkg.modules = { ...getModules(pkg), [String($(this).data('module'))]: $(this).prop('checked') };
+        saveSettings();
+    });
+
+    $root.on('click', '.rlw-generate', async () => {
+        const pkg = getPackage(selectedId);
+        if (!pkg || generatingIds.has(pkg.id) || !canGenerate(pkg)) return;
+        const hasText = String(pkg.full || '').trim() || String(pkg.cheat || '').trim();
+        if (hasText || isDirty()) {
+            const ok = await confirmPopup('Перегенерировать? Ручные правки в этом пакете пропадут.', 'Перегенерировать', 'Отмена');
+            if (!ok) return;
+            renderTexts(); // несохранённые правки в полях выбрасываем
+        }
+        awaitedId = pkg.id;
+        generatePackage(pkg.id);
+    });
+
     $root.on('input', '.rlw-text', function () {
         refreshTokens(String($(this).data('field')));
         refreshDirtyButtons();
@@ -558,6 +796,7 @@ export async function openWorkshop() {
     // --- Показ ---------------------------------------------------------------
 
     renderAll();
+    generationListeners.add(onGenerationChange);
 
     const c = ctx();
     const popup = new c.Popup(root, c.POPUP_TYPE.TEXT, '', {
@@ -569,6 +808,9 @@ export async function openWorkshop() {
         onClosing: async () => {
             await resolveDirty();
             return true;
+        },
+        onClose: () => {
+            generationListeners.delete(onGenerationChange);
         },
     });
     await popup.show();

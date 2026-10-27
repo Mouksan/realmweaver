@@ -18,6 +18,7 @@ import {
 } from './store.js';
 import { applyInjection, clampDepth } from './inject.js';
 import { openWorkshop } from './workshop.js';
+import { DEFAULT_INSTRUCTIONS } from './prompt.js';
 
 const EXTENSION_NAME = 'Realmweaver';
 
@@ -72,38 +73,54 @@ function settingsHtml() {
                     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
                 </div>
                 <div class="inline-drawer-content">
-                    <label class="checkbox_label" for="rlw_enabled">
-                        <input type="checkbox" id="rlw_enabled">
-                        <span>Включить Realmweaver</span>
-                    </label>
+                    <div class="rlw-settings-body">
+                        <label class="checkbox_label" for="rlw_enabled">
+                            <input type="checkbox" id="rlw_enabled">
+                            <span>Включить Realmweaver</span>
+                        </label>
 
-                    <div class="rlw-set-field">
-                        <label for="rlw_profile">Профиль подключения</label>
-                        <select id="rlw_profile" class="text_pole"></select>
-                        <div class="rlw-hint">Через этот профиль генерируются пакеты. Основная модель чата не трогается.</div>
-                    </div>
-
-                    <div class="rlw-set-grid">
                         <div class="rlw-set-field">
-                            <label for="rlw_response_tokens">Лимит ответа (токены)</label>
-                            <input type="number" id="rlw_response_tokens" class="text_pole" min="500" max="64000" step="100">
+                            <label for="rlw_profile">Профиль подключения</label>
+                            <select id="rlw_profile" class="text_pole"></select>
+                            <div class="rlw-hint">Через этот профиль генерируются пакеты. Основная модель чата не трогается.</div>
                         </div>
-                        <div class="rlw-set-field">
-                            <label for="rlw_lore_limit">Лимит лорбуков (токены)</label>
-                            <input type="number" id="rlw_lore_limit" class="text_pole" min="1000" max="500000" step="1000">
+
+                        <div class="rlw-set-grid">
+                            <div class="rlw-set-field">
+                                <label for="rlw_response_tokens">Лимит ответа (токены)</label>
+                                <input type="number" id="rlw_response_tokens" class="text_pole" min="500" max="64000" step="100">
+                            </div>
+                            <div class="rlw-set-field">
+                                <label for="rlw_lore_limit">Лимит лорбуков (токены)</label>
+                                <input type="number" id="rlw_lore_limit" class="text_pole" min="1000" max="500000" step="1000">
+                            </div>
                         </div>
-                    </div>
-                    <div class="rlw-hint">Если выбранные лорбуки толще — лишние записи отрежутся, начиная с самых последних по порядку.</div>
+                        <div class="rlw-hint">Если выбранные лорбуки толще — лишние записи отрежутся, начиная с самых последних по порядку.</div>
 
-                    <div class="rlw-set-field rlw-set-field--short">
-                        <label for="rlw_cheat_depth">Глубина шпаргалки</label>
-                        <input type="number" id="rlw_cheat_depth" class="text_pole" min="0" max="50" step="1">
-                    </div>
+                        <div class="rlw-set-field rlw-set-field--short">
+                            <label for="rlw_cheat_depth">Глубина шпаргалки</label>
+                            <input type="number" id="rlw_cheat_depth" class="text_pole" min="0" max="50" step="1">
+                        </div>
 
-                    <button id="rlw_open_btn" class="menu_button rlw-panel-btn">
-                        <i class="fa-solid fa-mountain-sun"></i>
-                        <span>Открыть мастерскую миров</span>
-                    </button>
+                        <div class="inline-drawer rlw-prompt-drawer">
+                            <div class="inline-drawer-toggle inline-drawer-header">
+                                <span>Промт генерации</span>
+                                <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+                            </div>
+                            <div class="inline-drawer-content">
+                                <div class="rlw-settings-body">
+                                    <textarea id="rlw_prompt" class="text_pole" rows="12"></textarea>
+                                    <div class="rlw-hint">Общие правила для модели (на английском). Параметры, модули, источники и формат ответа подставляются сами.</div>
+                                    <button id="rlw_prompt_reset" class="menu_button">Сбросить к стандартному</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button id="rlw_open_btn" class="menu_button rlw-panel-btn">
+                            <i class="fa-solid fa-mountain-sun"></i>
+                            <span>Открыть мастерскую миров</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -161,6 +178,21 @@ function mountSettings() {
         $(this).val(value);
         saveSettings();
         applyInjection();
+    });
+
+    // Промт: в поле всегда видно действующий текст. Если он совпадает со
+    // стандартным — храним пустую строку, чтобы будущие улучшения
+    // стандартного промта до тебя доезжали.
+    $('#rlw_prompt').val(String(s.promptTemplate || '').trim() || DEFAULT_INSTRUCTIONS);
+    $('#rlw_prompt').on('input', function () {
+        const value = String($(this).val() || '');
+        getSettings().promptTemplate = value.trim() === DEFAULT_INSTRUCTIONS.trim() ? '' : value;
+        saveSettings();
+    });
+    $('#rlw_prompt_reset').on('click', () => {
+        getSettings().promptTemplate = '';
+        $('#rlw_prompt').val(DEFAULT_INSTRUCTIONS);
+        saveSettings();
     });
 
     $('#rlw_open_btn').on('click', openWorkshop);

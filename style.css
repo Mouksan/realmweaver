@@ -6,7 +6,10 @@
 
 /* --- Ящик в панели расширений --- */
 
-.realmweaver-settings .inline-drawer-content {
+/* Отступы — на внутренней обёртке, а не на .inline-drawer-content:
+ * иначе display: flex перебивает штатное display: none, и ящик не
+ * сворачивается. */
+.realmweaver-settings .rlw-settings-body {
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -354,14 +357,128 @@
     opacity: 0.6;
 }
 
+.rlw-lore-counter-bar {
+    /* Прилипает к низу окна, пока блок лорбуков на экране, — тотал
+     * видно без прокрутки до конца списка. */
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin: 4px -12px -10px -12px;
+    padding: 9px 12px;
+    border-top: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 0 0 10px 10px;
+    background-color: var(--SmartThemeBlurTintColor);
+    backdrop-filter: blur(var(--SmartThemeBlurStrength, 10px));
+}
+
 .rlw-lore-counter {
-    margin-top: 4px;
     font-size: 0.9em;
-    opacity: 0.8;
+    opacity: 0.85;
 }
 
 .rlw-lore-counter--over {
     opacity: 1;
     color: var(--warning, #e8a33d);
     font-weight: 600;
+}
+
+/* --- Промт генерации в ящике настроек --- */
+
+.rlw-prompt-drawer {
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 10px;
+    padding: 0 10px;
+}
+
+.rlw-prompt-drawer #rlw_prompt {
+    width: 100%;
+    margin: 0;
+    resize: vertical;
+    font-family: var(--monoFontFamily, monospace);
+    font-size: 0.82em;
+    line-height: 1.4;
+}
+
+.rlw-prompt-drawer #rlw_prompt_reset {
+    align-self: flex-end;
+    margin: 0;
+}
+
+/* --- Вкладка «Параметры» --- */
+
+.rlw-param-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 12px;
+}
+
+.rlw-param {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.rlw-param-label {
+    font-size: 0.9em;
+    opacity: 0.85;
+}
+
+.rlw-param select,
+.rlw-param input,
+.rlw-param textarea {
+    width: 100%;
+    margin: 0;
+}
+
+.rlw-param textarea {
+    resize: vertical;
+}
+
+.rlw-segmented {
+    display: flex;
+    width: 100%;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.rlw-seg {
+    flex: 1 1 0;
+    padding: 7px 10px;
+    border: 0;
+    border-right: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: background-color 0.14s ease;
+}
+
+.rlw-seg:last-child {
+    border-right: 0;
+}
+
+.rlw-seg:hover {
+    background-color: var(--SmartThemeBotMesBlurTintColor);
+}
+
+.rlw-seg[aria-pressed="true"] {
+    background-color: color-mix(in srgb, var(--SmartThemeQuoteColor) 40%, transparent);
+    color: var(--SmartThemeBodyColor);
+    font-weight: 600;
+}
+
+.rlw-module-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 12px;
+}
+
+/* --- Кнопка генерации в работе --- */
+
+.rlw-generate--busy:disabled {
+    opacity: 0.8;
+    cursor: progress;
 }
