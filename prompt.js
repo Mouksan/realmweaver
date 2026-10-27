@@ -97,11 +97,43 @@ export function getParams(pkg) {
 // Модули (разделы пакета)
 // ---------------------------------------------------------------------------
 
-function blacklistInstruction(language) {
+// Мат — не русизм: он про тело и эмоции, а не про нашу веру или историю,
+// и одинаково уместен в любом мире. Замены нужны только ругани, привязанной
+// к нашей религии и фольклору.
+const PROFANITY_RULE = {
+    ru: 'IMPORTANT: obscene and coarse profanity (мат: блять, пиздец, хуй, сука, ебать and the like) is NOT foreign to any world — it is about bodies and emotions, not about our religion or history. Never blacklist it and never offer replacements for it. Only curses tied to OUR religion and folklore (Господи, чёрт, ад, к дьяволу, ей-богу) get in-world replacements.',
+    en: 'IMPORTANT: obscene and coarse profanity (fuck, shit, bastard and the like) is NOT foreign to any world — it is about bodies and emotions, not about our religion or history. Never blacklist it and never offer replacements for it. Only curses tied to OUR religion (oh my God, Jesus, for Christ\'s sake, go to hell, damn you) get in-world replacements.',
+};
+
+/**
+ * Инструкция чёрного списка. Земные единицы времени и расстояния в неё
+ * попадают, только если включён модуль «Время, меры, деньги»: выключила
+ * модуль — минуты и часы остаются как есть.
+ */
+function blacklistInstruction(language, modules) {
+    const replaceUnits = Boolean(modules?.time);
     if (language === 'en') {
-        return 'This roleplay is written in ENGLISH. List at least 30 words and phrases from OUR world that a model is likely to slip into THIS setting — modern idioms and slang (okay, deadline, adrenaline, stressed out, on autopilot), technical, office and psychology jargon, Earth units (seconds, minutes, hours as precise units, miles, meters, degrees), Christian expressions (oh my God, Jesus, damn, hell — unless they fit this world), weekday and month names, and anachronistic objects and concepts. Give every one an in-world replacement. Format: `- word → replacement`. Include idioms, not only single words.';
+        const units = replaceUnits
+            ? 'Earth units (seconds, minutes, hours as precise units, miles, meters, degrees), '
+            : '';
+        const unitsNote = replaceUnits
+            ? ''
+            : ' Ordinary time and distance units (seconds, minutes, hours, miles) are acceptable in this roleplay — do not blacklist them.';
+        return 'This roleplay is written in ENGLISH. List at least 30 words and phrases from OUR world that a model is likely to slip into THIS setting — modern idioms and slang (okay, deadline, adrenaline, stressed out, on autopilot), technical, office and psychology jargon, '
+            + units
+            + 'Christian expressions (oh my God, Jesus, for Christ\'s sake — unless they fit this world), weekday and month names, and anachronistic objects and concepts. Give every one an in-world replacement. Format: `- word → replacement`. Include idioms, not only single words.'
+            + unitsNote + ' ' + PROFANITY_RULE.en;
     }
-    return 'This roleplay is written in RUSSIAN, and models writing fantasy in Russian keep slipping into words that belong to OUR world: Russian peasant and folk vocabulary (изба, барин, щи, сарафан, батюшка as an address) unless the setting is Slavic; Orthodox Christian expressions (Господи, ей-богу, слава богу, с богом, чёрт, ад); Soviet and bureaucratic phrasing; modern colloquialisms and office, tech and psychology jargon (окей, супер, минутка, адреналин, стресс, шок, на автомате, нервы); Earth units (секунда, минута, час as a precise unit, метр, километр, градус, верста, рубль, копейка); weekday names (воскресенье, суббота); anachronistic objects and concepts. List at least 30 such words and phrases that are LIKELY to appear in THIS particular setting and give every one an in-world replacement. Format: `- слово → замена`. Include idioms and set phrases, not only single words. Every line must have a replacement — no bare bans.';
+    const units = replaceUnits
+        ? 'Earth units (секунда, минута, минутка, час as a precise unit, метр, километр, градус, верста); '
+        : '';
+    const unitsNote = replaceUnits
+        ? ''
+        : ' Ordinary time and distance units (секунда, минута, час, метр, километр) are acceptable in this roleplay — do not blacklist them.';
+    return 'This roleplay is written in RUSSIAN, and models writing fantasy in Russian keep slipping into words that belong to OUR world: Russian peasant, folk and old Russian military vocabulary (изба, барин, щи, сарафан, стопарь, сотник, воевода, батюшка as an address) unless the setting is Slavic; Orthodox Christian expressions (Господи, ей-богу, слава богу, с богом, чёрт, ад); Soviet and bureaucratic phrasing; modern colloquialisms and office, tech and psychology jargon (окей, супер, адреналин, стресс, шок, на автомате); '
+        + units
+        + 'our money (рубль, копейка); weekday names (воскресенье, суббота); anachronistic objects and concepts. List at least 30 such words and phrases that are LIKELY to appear in THIS particular setting and give every one an in-world replacement. Format: `- слово → замена`. Include idioms and set phrases, not only single words. Every line must have a replacement — no bare bans.'
+        + unitsNote + ' ' + PROFANITY_RULE.ru;
 }
 
 export const MODULES = [
@@ -123,7 +155,7 @@ export const MODULES = [
     {
         id: 'oaths',
         label: 'Клятвы, ругань, божества',
-        prompt: 'OATHS, CURSES, DEITIES — who people swear by, everyday exclamations, curses and blessings, greetings and farewells. Give the actual phrases, ready to drop into dialogue.',
+        prompt: 'OATHS, CURSES, DEITIES — who people swear by, everyday exclamations, curses and blessings, greetings and farewells. Give the actual phrases, ready to drop into dialogue. In-world oaths ADD flavour; they never replace ordinary profanity, which stays available in every scene.',
     },
     {
         id: 'lexicon',
@@ -138,7 +170,7 @@ export const MODULES = [
     {
         id: 'blacklist',
         label: 'Чёрный список с заменами',
-        prompt: (language) => `BLACKLIST WITH REPLACEMENTS — ${blacklistInstruction(language)}`,
+        prompt: (language, modules) => `BLACKLIST WITH REPLACEMENTS — ${blacklistInstruction(language, modules)}`,
     },
 ];
 
@@ -223,7 +255,7 @@ export function buildMessages(pkg, sourcesText) {
     for (const module of MODULES) {
         if (!modules[module.id]) continue;
         n++;
-        const text = typeof module.prompt === 'function' ? module.prompt(language) : module.prompt;
+        const text = typeof module.prompt === 'function' ? module.prompt(language, modules) : module.prompt;
         lines.push(`${n}. ${text}`);
     }
     lines.push('');
@@ -242,7 +274,8 @@ export function buildMessages(pkg, sourcesText) {
     lines.push('</cheat>');
     lines.push('');
     lines.push('<full> is the main reference. Dense rather than long: roughly 800–1500 words.');
-    lines.push('<cheat> sits right next to the latest messages in EVERY request, so keep it tight: at most ~25 lines. Only the replacement pairs most likely to slip (`- X → Y`) and the in-world units of time, distance and money. No headers, no explanations.');
+    const cheatUnits = modules.time ? ' and the in-world units of time, distance and money' : '';
+    lines.push(`<cheat> sits right next to the latest messages in EVERY request, so keep it tight: at most ~25 lines. Only the replacement pairs most likely to slip (\`- X → Y\`)${cheatUnits}. Never put profanity into the replacement pairs. No headers, no explanations.`);
 
     return [
         { role: 'system', content: getInstructions() },

@@ -7,7 +7,7 @@
     "js": "index.js",
     "css": "style.css",
     "author": "Mouksan",
-    "version": "0.4.0",
+    "version": "0.4.1",
     "homePage": "https://github.com/Mouksan/realmweaver",
     "auto_update": true
 }
