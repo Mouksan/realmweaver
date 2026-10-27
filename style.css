@@ -1,0 +1,281 @@
+/* Realmweaver — стили ящика настроек и окна «Мастерская миров».
+ *
+ * Цвета берём из переменных темы таверны (--SmartTheme...), как в
+ * Plotweaver, чтобы всё выглядело родным в любой теме, включая телеграмную.
+ */
+
+/* --- Ящик в панели расширений --- */
+
+.realmweaver-settings .inline-drawer-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.rlw-set-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.rlw-set-field--short input {
+    max-width: 90px;
+}
+
+.rlw-set-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.realmweaver-settings .rlw-panel-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    margin: 4px 0 0 0;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.rlw-hint {
+    opacity: 0.65;
+    font-size: 0.85em;
+    line-height: 1.35;
+}
+
+/* --- Окно мастерской --- */
+
+.rlw-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 4px 2px;
+    text-align: left;
+}
+
+.rlw-head {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.rlw-title {
+    margin: 0;
+}
+
+.rlw-status {
+    padding: 8px 12px;
+    border: 1px dashed var(--SmartThemeBorderColor);
+    border-radius: 8px;
+    font-size: 0.92em;
+    opacity: 0.8;
+}
+
+.rlw-status--active {
+    border-style: solid;
+    border-color: var(--SmartThemeQuoteColor);
+    background-color: color-mix(in srgb, var(--SmartThemeQuoteColor) 14%, transparent);
+    opacity: 1;
+}
+
+.rlw-pkg-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.rlw-pkg-row .rlw-pkg-select {
+    flex: 1 1 220px;
+    margin: 0;
+}
+
+.rlw-pkg-row .menu_button {
+    margin: 0;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.rlw-pkg-row .menu_button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.rlw-empty {
+    padding: 28px 12px;
+    text-align: center;
+    opacity: 0.7;
+    border: 1px dashed var(--SmartThemeBorderColor);
+    border-radius: 10px;
+}
+
+.rlw-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.rlw-label {
+    font-weight: 600;
+}
+
+/* --- Где действует --- */
+
+.rlw-place {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 10px;
+}
+
+.rlw-radio {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.rlw-radio input {
+    margin: 0;
+}
+
+.rlw-radio--disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.rlw-chat-off {
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--SmartThemeBorderColor);
+}
+
+/* --- Вкладки (в стиле сегментов Plotweaver) --- */
+
+.rlw-tabs {
+    display: flex;
+    width: 100%;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.rlw-tab {
+    flex: 1 1 0;
+    padding: 9px 10px;
+    border: 0;
+    border-right: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 0.95em;
+    cursor: pointer;
+    transition: background-color 0.14s ease, color 0.14s ease;
+}
+
+.rlw-tab:last-child {
+    border-right: 0;
+}
+
+.rlw-tab:hover {
+    background-color: var(--SmartThemeBotMesBlurTintColor);
+}
+
+.rlw-tab[aria-pressed="true"] {
+    background-color: color-mix(in srgb, var(--SmartThemeQuoteColor) 40%, transparent);
+    color: var(--SmartThemeBodyColor);
+    font-weight: 600;
+}
+
+.rlw-tab-panel {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.rlw-tab-panel--active {
+    display: flex;
+}
+
+.rlw-stub {
+    padding: 28px 12px;
+    text-align: center;
+    opacity: 0.6;
+    border: 1px dashed var(--SmartThemeBorderColor);
+    border-radius: 10px;
+}
+
+/* --- Вкладка «Пакет» --- */
+
+.rlw-generate {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    margin: 0;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.rlw-generate:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.rlw-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.rlw-field-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.rlw-tokens {
+    opacity: 0.6;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+.rlw-text {
+    width: 100%;
+    margin: 0;
+    resize: vertical;
+    font-size: 0.92em;
+    line-height: 1.45;
+}
+
+.rlw-footer {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.rlw-footer .menu_button {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.rlw-footer .menu_button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}

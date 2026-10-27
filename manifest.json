@@ -1,0 +1,13 @@
+{
+    "display_name": "realmweaver",
+    "loading_order": 100,
+    "requires": [],
+    "optional": [],
+    "dependencies": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "Mouksan",
+    "version": "0.2.0",
+    "homePage": "https://github.com/Mouksan/realmweaver",
+    "auto_update": true
+}
