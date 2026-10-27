@@ -105,6 +105,14 @@ const PROFANITY_RULE = {
     en: 'IMPORTANT: obscene and coarse profanity (fuck, shit, bastard and the like) is NOT foreign to any world — it is about bodies and emotions, not about our religion or history. Never blacklist it and never offer replacements for it. Only curses tied to OUR religion (oh my God, Jesus, for Christ\'s sake, go to hell, damn you) get in-world replacements.',
 };
 
+// Примеры в скобках — это категории, а не чек-лист: иначе модель
+// переписывает их подряд («психолог», «файл»), даже если в этом мире их
+// никто и не ляпнет.
+const EXAMPLES_RULE = {
+    ru: 'The words in brackets above only illustrate the categories — they are NOT a checklist. Include an example only if it could genuinely slip into THIS setting, and spend most of the list on traps specific to this world: its genre, species, social order and magic (for instance, modern terms the genre tends to drag in).',
+    en: 'The words in brackets above only illustrate the categories — they are NOT a checklist. Include an example only if it could genuinely slip into THIS setting, and spend most of the list on traps specific to this world: its genre, species, social order and magic (for instance, modern terms the genre tends to drag in).',
+};
+
 /**
  * Инструкция чёрного списка. Земные единицы времени и расстояния в неё
  * попадают, только если включён модуль «Время, меры, деньги»: выключила
@@ -121,8 +129,8 @@ function blacklistInstruction(language, modules) {
             : ' Ordinary time and distance units (seconds, minutes, hours, miles) are acceptable in this roleplay — do not blacklist them.';
         return 'This roleplay is written in ENGLISH. List at least 30 words and phrases from OUR world that a model is likely to slip into THIS setting — modern idioms and slang (okay, deadline, adrenaline, stressed out, on autopilot), technical, office and psychology jargon, '
             + units
-            + 'Christian expressions (oh my God, Jesus, for Christ\'s sake — unless they fit this world), weekday and month names, and anachronistic objects and concepts. Give every one an in-world replacement. Format: `- word → replacement`. Include idioms, not only single words.'
-            + unitsNote + ' ' + PROFANITY_RULE.en;
+            + 'Christian expressions (oh my God, Jesus, for Christ\'s sake — unless they fit this world), weekday and month names, and anachronistic objects and concepts. Give every one an in-world replacement. Format: `- word → replacement`. Include idioms, not only single words. ' + EXAMPLES_RULE.en
+            + ' ' + [unitsNote.trim(), PROFANITY_RULE.en].filter(Boolean).join(' ');
     }
     const units = replaceUnits
         ? 'Earth units (секунда, минута, минутка, час as a precise unit, метр, километр, градус, верста); '
@@ -132,8 +140,8 @@ function blacklistInstruction(language, modules) {
         : ' Ordinary time and distance units (секунда, минута, час, метр, километр) are acceptable in this roleplay — do not blacklist them.';
     return 'This roleplay is written in RUSSIAN, and models writing fantasy in Russian keep slipping into words that belong to OUR world: Russian peasant, folk and old Russian military vocabulary (изба, барин, щи, сарафан, стопарь, сотник, воевода, батюшка as an address) unless the setting is Slavic; Orthodox Christian expressions (Господи, ей-богу, слава богу, с богом, чёрт, ад); Soviet and bureaucratic phrasing; modern colloquialisms and office, tech and psychology jargon (окей, супер, адреналин, стресс, шок, на автомате); '
         + units
-        + 'our money (рубль, копейка); weekday names (воскресенье, суббота); anachronistic objects and concepts. List at least 30 such words and phrases that are LIKELY to appear in THIS particular setting and give every one an in-world replacement. Format: `- слово → замена`. Include idioms and set phrases, not only single words. Every line must have a replacement — no bare bans.'
-        + unitsNote + ' ' + PROFANITY_RULE.ru;
+        + 'our money (рубль, копейка); weekday names (воскресенье, суббота); anachronistic objects and concepts. List at least 30 such words and phrases that are LIKELY to appear in THIS particular setting and give every one an in-world replacement. Format: `- слово → замена`. Include idioms and set phrases, not only single words. Every line must have a replacement — no bare bans. ' + EXAMPLES_RULE.ru
+        + ' ' + [unitsNote.trim(), PROFANITY_RULE.ru].filter(Boolean).join(' ');
 }
 
 export const MODULES = [
@@ -261,7 +269,13 @@ export function buildMessages(pkg, sourcesText) {
     lines.push('');
 
     lines.push('# LANGUAGE');
-    lines.push(`Write everything inside <full> and <cheat> in ${languageName}, section headers included. Keep in-world names exactly as the sources spell them.`);
+    lines.push(`Write everything inside <full> and <cheat> in ${languageName}, section headers included.`);
+    lines.push(`Every in-world name and term must be ready to use in a ${languageName} roleplay: if the sources spell it in another language (or you invent it), give it in ${languageName} — transliterate names, translate or transliterate terms. Never add original-language glosses in parentheses — not for names, not for terms, not for phrases.`);
+    lines.push('');
+
+    lines.push('# WORLD CONSISTENCY');
+    lines.push('- Never convert in-world measures into our units: no centimetres, metres, grams, kilograms, litres or similar, not even in brackets. Define every in-world unit through other in-world things (e.g. a mile is a thousand paces).');
+    lines.push('- Holidays, customs and institutions may echo themes from our world, but never copy their names: give them native in-world names. If the sources already name something, use that name.');
     lines.push('');
 
     lines.push('# OUTPUT FORMAT');
