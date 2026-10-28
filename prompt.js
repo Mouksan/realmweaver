@@ -127,9 +127,9 @@ function blacklistInstruction(language, modules) {
         const unitsNote = replaceUnits
             ? ''
             : ' Ordinary time and distance units (seconds, minutes, hours, miles) are acceptable in this roleplay — do not blacklist them.';
-        return 'This roleplay is written in ENGLISH. List at least 30 words and phrases from OUR world that a model is likely to slip into THIS setting — modern idioms and slang (okay, deadline, adrenaline, stressed out, on autopilot), technical, office and psychology jargon, '
+        return 'This roleplay is written in ENGLISH. List about 25–30 words and phrases from OUR world that a model is likely to slip into THIS setting — modern idioms and slang (okay, deadline, adrenaline, stressed out, on autopilot), technical, office and psychology jargon, '
             + units
-            + 'Christian expressions (oh my God, Jesus, for Christ\'s sake — unless they fit this world), weekday and month names, and anachronistic objects and concepts. Give every one an in-world replacement. Format: `- word → replacement`. Include idioms, not only single words. ' + EXAMPLES_RULE.en
+            + 'Christian expressions (oh my God, Jesus, for Christ\'s sake — unless they fit this world), weekday and month names, and anachronistic objects and concepts. Give every one an in-world replacement. Format: `word → replacement`. Include idioms, not only single words. Both sides of every pair are in English. ' + EXAMPLES_RULE.en
             + ' ' + [unitsNote.trim(), PROFANITY_RULE.en].filter(Boolean).join(' ');
     }
     const units = replaceUnits
@@ -138,9 +138,9 @@ function blacklistInstruction(language, modules) {
     const unitsNote = replaceUnits
         ? ''
         : ' Ordinary time and distance units (секунда, минута, час, метр, километр) are acceptable in this roleplay — do not blacklist them.';
-    return 'This roleplay is written in RUSSIAN, and models writing fantasy in Russian keep slipping into words that belong to OUR world: Russian peasant, folk and old Russian military vocabulary (изба, барин, щи, сарафан, стопарь, сотник, воевода, батюшка as an address) unless the setting is Slavic; Orthodox Christian expressions (Господи, ей-богу, слава богу, с богом, чёрт, ад); Soviet and bureaucratic phrasing; modern colloquialisms and office, tech and psychology jargon (окей, супер, адреналин, стресс, шок, на автомате); '
+    return 'This roleplay is written in RUSSIAN, and models writing fantasy in Russian keep slipping into words that belong to OUR world: Russian peasant, folk and old Russian military vocabulary (изба, барин, щи, сарафан, батюшка as an address) unless the setting is Slavic; Orthodox Christian expressions (Господи, ей-богу, слава богу, с богом, чёрт, ад); Soviet and bureaucratic phrasing; modern colloquialisms and office, tech and psychology jargon (окей, супер, адреналин, стресс, шок, на автомате); '
         + units
-        + 'our money (рубль, копейка); weekday names (воскресенье, суббота); anachronistic objects and concepts. List at least 30 such words and phrases that are LIKELY to appear in THIS particular setting and give every one an in-world replacement. Format: `- слово → замена`. Include idioms and set phrases, not only single words. Every line must have a replacement — no bare bans. ' + EXAMPLES_RULE.ru
+        + 'our money (рубль, копейка); weekday names (воскресенье, суббота); anachronistic objects and concepts. List about 25–30 such words and phrases that are LIKELY to appear in THIS particular setting and give every one an in-world replacement. Format: `слово → замена`. Include idioms and set phrases, not only single words. Every pair must have a replacement — no bare bans. Both sides of every pair are in Russian: no English or other foreign words (nobody types «deadline» in a Russian roleplay). ' + EXAMPLES_RULE.ru
         + ' ' + [unitsNote.trim(), PROFANITY_RULE.ru].filter(Boolean).join(' ');
 }
 
@@ -153,7 +153,7 @@ export const MODULES = [
     {
         id: 'time',
         label: 'Время, меры, деньги',
-        prompt: 'TIME, MEASURES, MONEY — how time is told (parts of the day, watches, bells, candle or incense lengths), the calendar (days, months, seasons, holidays with in-world names), units of distance, weight and volume, the currency with its denominations and rough prices of everyday things.',
+        prompt: 'TIME, MEASURES, MONEY — how time is told (parts of the day, watches, bells, candle or incense lengths), the calendar (days, months, seasons, holidays with in-world names), units of distance, weight and volume, the currency with its denominations and rough prices of everyday things. Define every unit ONLY through in-world references (paces, cups, a day\'s ride, how much a porter carries) — never through our units and never "about N of our…".',
     },
     {
         id: 'address',
@@ -168,7 +168,7 @@ export const MODULES = [
     {
         id: 'lexicon',
         label: 'Словарь мира',
-        prompt: 'WORLD VOCABULARY — in-world terms from the sources plus fitting new ones: places, institutions, ranks, creatures, foods, objects. Word + a very short gloss.',
+        prompt: 'WORLD VOCABULARY — words of the world, not of the story: places and regions, institutions, ranks, peoples and species, plants and materials, objects. Word + a very short gloss. NO characters, NO named animals, NO events, NO plot — those live in the lorebook already. At most ~15 entries.',
     },
     {
         id: 'food',
@@ -310,6 +310,9 @@ export function buildMessages(pkg, sourcesText) {
     lines.push('# WORLD CONSISTENCY');
     lines.push('- Concepts may resemble our pre-modern practice (bells, candles, night watches, market days); only the WORDS must not be ours.');
     lines.push('- Never measure anything in our units and never compare with them: no centimetres, metres, grams, kilograms, litres, no "about a hundred of our grams" or "half of our hour". Define every in-world unit through other in-world things (e.g. "a thousand paces", "as much as a man drinks at one go").');
+    lines.push(language === 'ru'
+        ? '- The words «наш», «наша», «наши», «наших» must not appear in the package at all when they refer to our world.'
+        : '- The phrase "our world" and comparisons like "our hour", "our mile" must not appear in the package at all.');
     lines.push('- Holidays, customs and institutions may take a theme from our world, but never its name: give them native in-world names. If the sources already name something, use that name.');
     lines.push('- No meta-commentary inside the package (no "possibly a typo in the source", no notes to the author).');
     lines.push('');
@@ -323,10 +326,12 @@ export function buildMessages(pkg, sourcesText) {
     lines.push('…the cheat sheet…');
     lines.push('</cheat>');
     lines.push('');
-    lines.push('<full> is the main reference. Dense rather than long: roughly 800–1500 words.');
-    lines.push('Compact layout inside each section: pack related items into one line, separated by semicolons (e.g. `- Lighting: …; …; …`). No bold sub-headers inside sections, no one-word lines.');
+    lines.push('SIZE LIMITS — they are strict:');
+    lines.push(`- <full>: about 3,000 tokens in total (${language === 'ru' ? 'roughly 1,000–1,200 Russian words' : 'roughly 2,000 English words'}). Density over length.`);
+    lines.push('- Every section: at most ~10 bullet lines. Each line is a topic label plus 3–6 related items separated by semicolons (e.g. `- Lighting: …; …; …`). No one-word or two-word lines, no bold sub-headers inside sections.');
+    lines.push('- The blacklist: at most ~30 pairs in total, grouped by kind, 3–5 pairs per line separated by semicolons (e.g. `- Faith: Господи → …; ей-богу → …; слава богу → …`).');
     const cheatUnits = modules.time ? ' and the in-world units of time, distance and money' : '';
-    lines.push(`<cheat> sits right next to the latest messages in EVERY request, so keep it tight: at most ~25 lines. Only the replacement pairs most likely to slip (\`- X → Y\`)${cheatUnits}. Never put profanity into the replacement pairs. No headers, no explanations.`);
+    lines.push(`<cheat> sits right next to the latest messages in EVERY request, so keep it tight: at most ~12 lines, 2–4 pairs per line separated by semicolons. Only the replacement pairs most likely to slip (\`X → Y\`)${cheatUnits}. Never put profanity into the replacement pairs. No headers, no explanations.`);
 
     return [
         { role: 'system', content: getInstructions() },
