@@ -220,6 +220,32 @@
 
 /* --- Вкладка «Пакет» --- */
 
+.rlw-generate-row {
+    display: flex;
+    gap: 8px;
+}
+
+.rlw-generate-row .rlw-generate {
+    flex: 1 1 auto;
+}
+
+.rlw-check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 10px 14px;
+    border-radius: 12px;
+    white-space: nowrap;
+}
+
+.rlw-check:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 .rlw-generate {
     display: flex;
     align-items: center;

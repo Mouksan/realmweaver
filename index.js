@@ -97,6 +97,12 @@ function settingsHtml() {
                         </div>
                         <div class="rlw-hint">Если выбранные лорбуки толще — лишние записи отрежутся, начиная с самых последних по порядку.</div>
 
+                        <label class="checkbox_label" for="rlw_self_check">
+                            <input type="checkbox" id="rlw_self_check">
+                            <span>Самопроверка пакета</span>
+                        </label>
+                        <div class="rlw-hint">После генерации модель перечитывает пакет по чек-листу и исправляет нарушения. Это ещё один запрос, генерация займёт примерно вдвое дольше.</div>
+
                         <div class="rlw-set-field rlw-set-field--short">
                             <label for="rlw_cheat_depth">Глубина шпаргалки</label>
                             <input type="number" id="rlw_cheat_depth" class="text_pole" min="0" max="50" step="1">
@@ -142,6 +148,12 @@ function mountSettings() {
     $('#rlw_response_tokens').val(s.responseTokens);
     $('#rlw_lore_limit').val(s.loreTokenLimit);
     $('#rlw_cheat_depth').val(s.cheatDepth);
+    $('#rlw_self_check').prop('checked', Boolean(s.selfCheck));
+
+    $('#rlw_self_check').on('change', function () {
+        getSettings().selfCheck = $(this).prop('checked');
+        saveSettings();
+    });
 
     $('#rlw_enabled').on('change', function () {
         getSettings().enabled = $(this).prop('checked');

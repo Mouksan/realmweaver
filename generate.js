@@ -8,6 +8,7 @@
 // обрезало по лимиту), берём текст до конца.
 
 import { ctx, getSettings } from './store.js';
+import { buildReviewMessages } from './prompt.js';
 
 // Запас на «невидимое» мышление reasoning-моделей (Gemini и т.п. тратят
 // лимит ответа и на размышления) — тот же приём, что в Plotweaver.
@@ -92,3 +93,16 @@ export async function requestCompletion(messages, signal) {
     if (typeof content === 'string') return content;
     return content ? JSON.stringify(content) : '';
 }
+
+/**
+ * Самопроверка: второй запрос, где модель-редактор чинит готовый пакет
+ * по чек-листу. Возвращает исправленные { full, cheat }; если редактор не
+ * вернул шпаргалку, оставляем прежнюю — она уже была проверена глазами
+ * или просто не нуждалась в правке.
+ */
+export async function reviewPackage(pkg, full, cheat, signal) {
+    const raw = await requestCompletion(buildReviewMessages(pkg, full, cheat), signal);
+    const fixed = parsePackage(raw);
+    return { full: fixed.full, cheat: fixed.cheat || cheat };
+}
+

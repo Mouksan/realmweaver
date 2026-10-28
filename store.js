@@ -29,6 +29,8 @@ const DEFAULTS = {
     cheatDepth: 2,
     // Свои общие правила для модели; пусто — берётся стандартный текст из prompt.js.
     promptTemplate: '',
+    // Самопроверка пакета вторым запросом после генерации (по умолчанию выключена).
+    selfCheck: false,
     packages: {},
     bindings: {},
     lastPackageId: '',

@@ -52,12 +52,13 @@ import {
     hasEnabledModules,
     buildMessages,
 } from './prompt.js';
-import { requestCompletion, parsePackage, errorText, EmptyResponseError } from './generate.js';
+import { requestCompletion, parsePackage, reviewPackage, errorText, EmptyResponseError } from './generate.js';
 
-// Пакеты, которые генерируются прямо сейчас (id). Живёт вне окна: если
-// закрыть мастерскую посреди генерации, результат всё равно сохранится,
-// а при повторном открытии кнопка покажет, что работа идёт.
-const generatingIds = new Set();
+// Пакеты, над которыми модель работает прямо сейчас: id → фаза
+// ('generate' — пишет пакет, 'review' — проверяет). Живёт вне окна: если
+// закрыть мастерскую посреди работы, результат всё равно сохранится,
+// а при повторном открытии кнопки покажут, что работа идёт.
+const busyPackages = new Map();
 
 const TOKEN_COUNT_DELAY = 400; // мс — не считаем токены на каждую букву
 
@@ -230,10 +231,16 @@ function dialogHtml() {
             </div>
 
             <div class="rlw-tab-panel" data-tab="package">
-                <button type="button" class="menu_button rlw-generate">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i>
-                    <span class="rlw-generate-label">Сгенерировать пакет</span>
-                </button>
+                <div class="rlw-generate-row">
+                    <button type="button" class="menu_button rlw-generate">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <span class="rlw-generate-label">Сгенерировать пакет</span>
+                    </button>
+                    <button type="button" class="menu_button rlw-check" title="Модель перечитает пакет по чек-листу и исправит нарушения">
+                        <i class="fa-solid fa-list-check"></i>
+                        <span>Проверить пакет</span>
+                    </button>
+                </div>
 
                 <div class="rlw-field">
                     <div class="rlw-field-head">
@@ -298,12 +305,27 @@ function canGenerate(pkg) {
     return true;
 }
 
+/** Проверки до ручной самопроверки. */
+function canReview(pkg) {
+    if (!pkg) return false;
+    if (!getSettings().profileId) {
+        toastr.warning('Не выбран профиль подключения — загляни в настройки Realmweaver.', 'Realmweaver');
+        return false;
+    }
+    return Boolean(String(pkg.full || '').trim());
+}
+
+function setBusy(pkgId, phase) {
+    if (phase) busyPackages.set(pkgId, phase);
+    else busyPackages.delete(pkgId);
+    notifyGeneration();
+}
+
 async function generatePackage(pkgId) {
     const pkg = getPackage(pkgId);
-    if (!pkg || generatingIds.has(pkgId) || !canGenerate(pkg)) return;
+    if (!pkg || busyPackages.has(pkgId) || !canGenerate(pkg)) return;
 
-    generatingIds.add(pkgId);
-    notifyGeneration();
+    setBusy(pkgId, 'generate');
     try {
         // Фиксируем в пакете выбор лорбуков, с которым он генерировался.
         storeLoreSelection(pkg, resolveLoreSelection(pkg));
@@ -316,7 +338,19 @@ async function generatePackage(pkgId) {
         }
 
         const raw = await requestCompletion(buildMessages(pkg, text));
-        const { full, cheat } = parsePackage(raw);
+        let { full, cheat } = parsePackage(raw);
+
+        // Самопроверка: второй запрос, модель-редактор чинит пакет по чек-листу.
+        // Если он упал — сохраняем то, что получилось на первом проходе.
+        if (getSettings().selfCheck && getPackage(pkgId)) {
+            setBusy(pkgId, 'review');
+            try {
+                ({ full, cheat } = await reviewPackage(pkg, full, cheat));
+            } catch (error) {
+                console.warn('[Realmweaver] самопроверка не удалась', error);
+                toastr.warning('Самопроверка не удалась — сохранён пакет без неё.', 'Realmweaver');
+            }
+        }
 
         if (!getPackage(pkgId)) return; // пакет удалили, пока ждали ответа
         updatePackageTexts(pkgId, { full, cheat });
@@ -332,8 +366,31 @@ async function generatePackage(pkgId) {
             toastr.error(`Генерация не удалась: ${errorText(error)}`, 'Realmweaver');
         }
     } finally {
-        generatingIds.delete(pkgId);
-        notifyGeneration();
+        setBusy(pkgId, null);
+    }
+}
+
+/** Ручная самопроверка уже готового пакета — без перегенерации. */
+async function checkPackage(pkgId) {
+    const pkg = getPackage(pkgId);
+    if (!pkg || busyPackages.has(pkgId) || !canReview(pkg)) return;
+
+    setBusy(pkgId, 'review');
+    try {
+        const { full, cheat } = await reviewPackage(pkg, pkg.full, pkg.cheat);
+        if (!getPackage(pkgId)) return;
+        updatePackageTexts(pkgId, { full, cheat });
+        applyInjection();
+        toastr.success(`Пакет «${getPackage(pkgId).name}» проверен.`, 'Realmweaver');
+    } catch (error) {
+        if (error instanceof EmptyResponseError) {
+            toastr.error('Модель вернула что-то странное — пакет не изменён. Попробуй ещё раз.', 'Realmweaver');
+        } else {
+            console.error('[Realmweaver] проверка не удалась', error);
+            toastr.error(`Проверка не удалась: ${errorText(error)}`, 'Realmweaver');
+        }
+    } finally {
+        setBusy(pkgId, null);
     }
 }
 
@@ -595,22 +652,27 @@ export async function openWorkshop() {
 
     // Пакет, генерацию которого это окно ждёт: когда она закончится,
     // текстовые поля надо перерисовать готовым результатом.
-    let awaitedId = generatingIds.has(selectedId) ? selectedId : null;
+    let awaitedId = busyPackages.has(selectedId) ? selectedId : null;
 
     const renderGenerateButton = () => {
         const pkg = getPackage(selectedId);
-        const busy = generatingIds.has(selectedId);
+        const phase = busyPackages.get(selectedId) || null;
+        const busy = Boolean(phase);
         const hasText = Boolean(pkg && (String(pkg.full || '').trim() || String(pkg.cheat || '').trim()));
+        const hasFull = Boolean(pkg && String(pkg.full || '').trim());
         const $button = $root.find('.rlw-generate');
         $button.prop('disabled', busy || !pkg).toggleClass('rlw-generate--busy', busy);
         $button.find('i').attr('class', busy ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-wand-magic-sparkles');
-        $button.find('.rlw-generate-label').text(busy ? 'Генерирую…' : (hasText ? 'Перегенерировать' : 'Сгенерировать пакет'));
-        // Пока идёт генерация, поля только для чтения — иначе правки затрёт результат.
+        const busyLabel = phase === 'review' ? 'Проверяю…' : 'Генерирую…';
+        $button.find('.rlw-generate-label').text(busy ? busyLabel : (hasText ? 'Перегенерировать' : 'Сгенерировать пакет'));
+        // «Проверить пакет» — только когда есть что проверять.
+        $root.find('.rlw-check').toggle(hasFull || busy).prop('disabled', busy);
+        // Пока модель работает, поля только для чтения — иначе правки затрёт результат.
         $root.find('.rlw-text').prop('readonly', busy);
     };
 
     const onGenerationChange = () => {
-        if (awaitedId && !generatingIds.has(awaitedId)) {
+        if (awaitedId && !busyPackages.has(awaitedId)) {
             if (awaitedId === selectedId) renderTexts();
             awaitedId = null;
         }
@@ -658,7 +720,7 @@ export async function openWorkshop() {
 
     const selectPackage = (id) => {
         selectedId = id || '';
-        awaitedId = generatingIds.has(selectedId) ? selectedId : null;
+        awaitedId = busyPackages.has(selectedId) ? selectedId : null;
         if (selectedId) setLastPackage(selectedId);
         renderAll();
     };
@@ -768,7 +830,7 @@ export async function openWorkshop() {
 
     $root.on('click', '.rlw-generate', async () => {
         const pkg = getPackage(selectedId);
-        if (!pkg || generatingIds.has(pkg.id) || !canGenerate(pkg)) return;
+        if (!pkg || busyPackages.has(pkg.id) || !canGenerate(pkg)) return;
         const hasText = String(pkg.full || '').trim() || String(pkg.cheat || '').trim();
         if (hasText || isDirty()) {
             const ok = await confirmPopup('Перегенерировать? Ручные правки в этом пакете пропадут.', 'Перегенерировать', 'Отмена');
@@ -777,6 +839,16 @@ export async function openWorkshop() {
         }
         awaitedId = pkg.id;
         generatePackage(pkg.id);
+    });
+
+    $root.on('click', '.rlw-check', async () => {
+        const pkg = getPackage(selectedId);
+        if (!pkg || busyPackages.has(pkg.id)) return;
+        // Проверяем то, что в полях: несохранённые правки сначала сохраняем (или выбрасываем).
+        await resolveDirty();
+        if (!canReview(pkg)) return;
+        awaitedId = pkg.id;
+        checkPackage(pkg.id);
     });
 
     $root.on('input', '.rlw-text', function () {

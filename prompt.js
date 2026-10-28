@@ -245,6 +245,58 @@ function nameSoundLine(params, language) {
         : 'matching the culture that the setting parameters and the sources suggest — never Slavic unless the setting is Slavic';
 }
 
+// ---------------------------------------------------------------------------
+// Правила пакета — общие для генерации и самопроверки
+// ---------------------------------------------------------------------------
+
+function languageRuleLines(params, language) {
+    const languageName = language === 'en' ? 'English' : 'Russian';
+    const slavic = params.archetype === 'slavic';
+    const lines = ['# LANGUAGE AND NAMES'];
+    lines.push(`Write everything inside <full> and <cheat> in ${languageName}, section headers included.`);
+    if (language === 'ru') {
+        if (slavic) {
+            lines.push('- Names and coined terms (places, months, holidays, units, coins, ranks, deities) are written in Cyrillic and sound Slavic — Slavic roots are native in this setting. Names taken from the sources are transliterated into Cyrillic as they sound.');
+            lines.push('- Never borrow church or liturgical vocabulary (заутреня, утреня, вечерня, повечерие, постный день, воскресение) — this world has its own faith.');
+        } else {
+            lines.push(`- Names and coined terms (places, months, holidays, units, coins, ranks, deities) are written in Cyrillic but must sound foreign to Russian ears: ${nameSoundLine(params, language)}. Names taken from the sources are transliterated into Cyrillic as they sound.`);
+            lines.push('- Never coin words from Slavic roots (no Студень, Травник, Ледогон-style names) and never borrow church or liturgical vocabulary (заутреня, утреня, вечерня, повечерие, постный день, воскресение).');
+        }
+        lines.push('- Plain everyday Russian words for ordinary things (хлеб, свеча, колокол, плащ) are fine — the foreign sound is for names and coined terms.');
+    } else {
+        lines.push(`- Names and coined terms (places, months, holidays, units, coins, ranks, deities) must sound foreign: ${nameSoundLine(params, language)}. Names taken from the sources keep their spelling.`);
+        lines.push('- Never borrow church or liturgical vocabulary (matins, vespers, compline, Sabbath, Lent) for in-world time or customs.');
+    }
+    lines.push('- Never add original-language glosses in parentheses — not for names, not for terms, not for phrases.');
+    return lines;
+}
+
+function consistencyRuleLines(language) {
+    return [
+        '# WORLD CONSISTENCY',
+        '- Concepts may resemble our pre-modern practice (bells, candles, night watches, market days); only the WORDS must not be ours.',
+        '- Never measure anything in our units and never compare with them: no centimetres, metres, grams, kilograms, litres, no "about a hundred of our grams" or "half of our hour". Define every in-world unit through other in-world things (e.g. "a thousand paces", "as much as a man drinks at one go").',
+        language === 'ru'
+            ? '- The words «наш», «наша», «наши», «наших» must not appear in the package at all when they refer to our world.'
+            : '- The phrase "our world" and comparisons like "our hour", "our mile" must not appear in the package at all.',
+        '- Holidays, customs and institutions may take a theme from our world, but never its name: give them native in-world names. If the sources already name something, use that name.',
+        '- No meta-commentary inside the package (no "possibly a typo in the source", no notes to the author).',
+    ];
+}
+
+function sizeRuleLines(language, modules) {
+    const cheatUnits = modules.time ? ' and the in-world units of time, distance and money' : '';
+    return [
+        'SIZE LIMITS — they are strict:',
+        // Модели не умеют считать свои токены и стабильно перебирают планку
+        // примерно в полтора раза — поэтому просим ~2000, чтобы приземлялось около 3000.
+        `- <full>: about 2,000 tokens in total (${language === 'ru' ? 'roughly 700–800 Russian words' : 'roughly 1,400 English words'}). Density over length.`,
+        '- Every section: at most ~10 bullet lines. Each line is a topic label plus 3–6 related items separated by semicolons (e.g. `- Lighting: …; …; …`). No one-word or two-word lines, no bold sub-headers inside sections.',
+        '- The blacklist: at most ~30 pairs in total, grouped by kind, 3–5 pairs per line separated by semicolons (e.g. `- Faith: Господи → …; ей-богу → …; слава богу → …`).',
+        `<cheat> sits right next to the latest messages in EVERY request, so keep it tight: at most ~12 lines, 2–4 pairs per line separated by semicolons. Only the replacement pairs most likely to slip (\`X → Y\`)${cheatUnits}. Never put profanity into the replacement pairs. No headers, no explanations.`,
+    ];
+}
+
 /** Есть ли хоть один включённый модуль. */
 export function hasEnabledModules(pkg) {
     return Object.values(getModules(pkg)).some(Boolean);
@@ -288,33 +340,9 @@ export function buildMessages(pkg, sourcesText) {
     }
     lines.push('');
 
-    const slavic = params.archetype === 'slavic';
-    lines.push('# LANGUAGE AND NAMES');
-    lines.push(`Write everything inside <full> and <cheat> in ${languageName}, section headers included.`);
-    if (language === 'ru') {
-        if (slavic) {
-            lines.push('- Names and coined terms (places, months, holidays, units, coins, ranks, deities) are written in Cyrillic and sound Slavic — Slavic roots are native in this setting. Names taken from the sources are transliterated into Cyrillic as they sound.');
-            lines.push('- Never borrow church or liturgical vocabulary (заутреня, вечерня, повечерие, постный день, воскресение) — this world has its own faith.');
-        } else {
-            lines.push(`- Names and coined terms (places, months, holidays, units, coins, ranks, deities) are written in Cyrillic but must sound foreign to Russian ears: ${nameSoundLine(params, language)}. Names taken from the sources are transliterated into Cyrillic as they sound.`);
-            lines.push('- Never coin words from Slavic roots (no Студень, Травник, Ледогон-style names) and never borrow church or liturgical vocabulary (заутреня, вечерня, повечерие, постный день, воскресение).');
-        }
-        lines.push('- Plain everyday Russian words for ordinary things (хлеб, свеча, колокол, плащ) are fine — the foreign sound is for names and coined terms.');
-    } else {
-        lines.push(`- Names and coined terms (places, months, holidays, units, coins, ranks, deities) must sound foreign: ${nameSoundLine(params, language)}. Names taken from the sources keep their spelling.`);
-        lines.push('- Never borrow church or liturgical vocabulary (matins, vespers, compline, Sabbath, Lent) for in-world time or customs.');
-    }
-    lines.push('- Never add original-language glosses in parentheses — not for names, not for terms, not for phrases.');
+    lines.push(...languageRuleLines(params, language));
     lines.push('');
-
-    lines.push('# WORLD CONSISTENCY');
-    lines.push('- Concepts may resemble our pre-modern practice (bells, candles, night watches, market days); only the WORDS must not be ours.');
-    lines.push('- Never measure anything in our units and never compare with them: no centimetres, metres, grams, kilograms, litres, no "about a hundred of our grams" or "half of our hour". Define every in-world unit through other in-world things (e.g. "a thousand paces", "as much as a man drinks at one go").');
-    lines.push(language === 'ru'
-        ? '- The words «наш», «наша», «наши», «наших» must not appear in the package at all when they refer to our world.'
-        : '- The phrase "our world" and comparisons like "our hour", "our mile" must not appear in the package at all.');
-    lines.push('- Holidays, customs and institutions may take a theme from our world, but never its name: give them native in-world names. If the sources already name something, use that name.');
-    lines.push('- No meta-commentary inside the package (no "possibly a typo in the source", no notes to the author).');
+    lines.push(...consistencyRuleLines(language));
     lines.push('');
 
     lines.push('# OUTPUT FORMAT');
@@ -326,17 +354,77 @@ export function buildMessages(pkg, sourcesText) {
     lines.push('…the cheat sheet…');
     lines.push('</cheat>');
     lines.push('');
-    lines.push('SIZE LIMITS — they are strict:');
-    // Модели не умеют считать свои токены и стабильно перебирают планку
-    // примерно в полтора раза — поэтому просим ~2000, чтобы приземлялось около 3000.
-    lines.push(`- <full>: about 2,000 tokens in total (${language === 'ru' ? 'roughly 700–800 Russian words' : 'roughly 1,400 English words'}). Density over length.`);
-    lines.push('- Every section: at most ~10 bullet lines. Each line is a topic label plus 3–6 related items separated by semicolons (e.g. `- Lighting: …; …; …`). No one-word or two-word lines, no bold sub-headers inside sections.');
-    lines.push('- The blacklist: at most ~30 pairs in total, grouped by kind, 3–5 pairs per line separated by semicolons (e.g. `- Faith: Господи → …; ей-богу → …; слава богу → …`).');
-    const cheatUnits = modules.time ? ' and the in-world units of time, distance and money' : '';
-    lines.push(`<cheat> sits right next to the latest messages in EVERY request, so keep it tight: at most ~12 lines, 2–4 pairs per line separated by semicolons. Only the replacement pairs most likely to slip (\`X → Y\`)${cheatUnits}. Never put profanity into the replacement pairs. No headers, no explanations.`);
+    lines.push(...sizeRuleLines(language, modules));
 
     return [
         { role: 'system', content: getInstructions() },
         { role: 'user', content: lines.join('\n') },
     ];
 }
+
+// ---------------------------------------------------------------------------
+// Самопроверка: модель-редактор чинит готовый пакет по чек-листу
+// ---------------------------------------------------------------------------
+
+const REVIEW_INSTRUCTIONS = `You are a meticulous editor of world-texture packages for a long-form fantasy roleplay. You receive a finished package and the rules it must follow. Your job is to find every violation and return a corrected package.
+
+How to work:
+- Fix violations; keep everything that is already correct, with its wording and flavour.
+- Do not invent new material beyond what a fix requires (a replacement name, a consistent number, a missing in-world replacement).
+- Keep the section structure and the order of sections.
+- Reply only with the corrected package in the required format: no comments, no list of changes.`;
+
+function reviewChecklistLines(language) {
+    const church = language === 'ru'
+        ? 'заутреня, утреня, вечерня, повечерие, постный день, воскресение, отче'
+        : 'matins, vespers, compline, Sabbath, Lent';
+    const disguised = language === 'ru'
+        ? 'Октарис ← октябрь, Генварис ← январь/генварь, Декларис ← декабрь'
+        : 'Octaris ← October, Decembris ← December, Sunsday ← Sunday';
+    return [
+        '# CHECKLIST — go through every item',
+        'Note: the LEFT side of blacklist and cheat-sheet pairs is SUPPOSED to hold words from our world (Господи, рубль, минута…) — that is what the pairs replace. Never "fix" the left side; check only the right side and the rest of the package.',
+        `1. Church or liturgical vocabulary (${church}) — replace with in-world terms everywhere, including the cheat sheet.`,
+        `2. Our months, weekdays or holidays in disguise (${disguised}) — rename them by the naming rules, consistently in every section and in the cheat sheet.`,
+        '3. Our units, comparisons with our units, the word "our", references to our world (Europe, centuries, the New World, real countries, real crops "not yet brought") — remove or rewrite in-world terms.',
+        '4. Internal arithmetic: units of time, distance, weight and money must agree with each other in every section and in the cheat sheet. Check durations against what they describe (if three sand-turns make one bell-interval, a body process cannot last fifteen sand-turns). Fix contradictory numbers.',
+        '5. One spelling per name throughout the package; fix typos and variant spellings.',
+        '6. The blacklist: remove duplicate pairs, bare bans (no replacement), non-pairs (X → X), nonsensical pairs, and any pair with foreign-language words; profanity must never appear in the pairs.',
+        '7. No original-language glosses in parentheses, no meta-commentary.',
+        '8. Size limits below: if the package is over them, trim the least useful items. Never drop a whole section.',
+    ];
+}
+
+/** Сообщения для самопроверки готового пакета. Источники редактору не нужны. */
+export function buildReviewMessages(pkg, full, cheat) {
+    const params = getParams(pkg);
+    const modules = getModules(pkg);
+    const language = params.language === 'en' ? 'en' : 'ru';
+    const languageName = language === 'en' ? 'English' : 'Russian';
+
+    const lines = [];
+    lines.push('# PACKAGE TO REVIEW', '', '<full>', String(full || '').trim(), '</full>', '<cheat>', String(cheat || '').trim(), '</cheat>', '');
+    lines.push('# CONTEXT');
+    lines.push(`- Roleplay language: ${languageName}`);
+    for (const param of PARAMS) lines.push(paramLine(param, params));
+    lines.push('');
+    lines.push('# RULES THE PACKAGE MUST FOLLOW');
+    lines.push(...languageRuleLines(params, language));
+    lines.push('');
+    lines.push(...consistencyRuleLines(language));
+    lines.push('');
+    lines.push(`- ${PROFANITY_RULE[language]}`);
+    lines.push('');
+    lines.push(...reviewChecklistLines(language));
+    lines.push('');
+    lines.push('# OUTPUT FORMAT');
+    lines.push('Reply with exactly two blocks and nothing outside them: the corrected <full>…</full> and the corrected <cheat>…</cheat>.');
+    lines.push('');
+    lines.push(...sizeRuleLines(language, modules));
+
+    return [
+        { role: 'system', content: REVIEW_INSTRUCTIONS },
+        { role: 'user', content: lines.join('\n') },
+    ];
+}
+
