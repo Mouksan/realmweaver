@@ -369,7 +369,8 @@ export function buildMessages(pkg, sourcesText) {
 const REVIEW_INSTRUCTIONS = `You are a meticulous editor of world-texture packages for a long-form fantasy roleplay. You receive a finished package and the rules it must follow. Your job is to find every violation and return a corrected package.
 
 How to work:
-- Fix violations; keep everything that is already correct, with its wording and flavour.
+- Fix ONLY the violations from the checklist. Everything else stays exactly as it is: same wording, same quoted phrases, same numbers and details, same line layout.
+- Do not paraphrase, do not shorten, do not summarise, do not reformat lines. Ready-to-use phrases in quotes stay ready-to-use phrases.
 - Do not invent new material beyond what a fix requires (a replacement name, a consistent number, a missing in-world replacement).
 - Keep the section structure and the order of sections.
 - Reply only with the corrected package in the required format: no comments, no list of changes.`;
@@ -391,7 +392,6 @@ function reviewChecklistLines(language) {
         '6. Internal arithmetic: units of time, distance, weight and money must agree with each other everywhere, including the cheat-sheet summary. Check durations against what they describe (if three sand-turns make one bell-interval, a body process cannot last fifteen sand-turns). Fix contradictory numbers.',
         '7. One spelling per name throughout; fix typos and variant spellings.',
         '8. No original-language glosses in parentheses, no meta-commentary.',
-        '9. Size limits below: if over them, trim the least useful items. Never drop a whole section.',
     ];
 }
 
@@ -420,8 +420,8 @@ export function buildReviewMessages(pkg, full, cheat) {
     lines.push('');
     lines.push('# OUTPUT FORMAT');
     lines.push('Reply with exactly two blocks and nothing outside them: the corrected <full>…</full> (without a blacklist section) and the corrected <cheat>…</cheat> (only the summary lines, no replacement pairs).');
-    lines.push('');
-    lines.push(...sizeRuleLines(language, modules).slice(0, 3));
+    lines.push('Length is NOT your concern: the package must come back about as long as it came in. If nothing on the checklist is violated in a line, copy that line unchanged.');
+
 
     return [
         { role: 'system', content: REVIEW_INSTRUCTIONS },
