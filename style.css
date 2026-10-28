@@ -222,6 +222,7 @@
 
 .rlw-generate-row {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
 }
 
@@ -239,6 +240,10 @@
     padding: 10px 14px;
     border-radius: 12px;
     white-space: nowrap;
+}
+
+.rlw-undo {
+    opacity: 0.8;
 }
 
 .rlw-check:disabled {

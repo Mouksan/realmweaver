@@ -20,6 +20,7 @@ import {
     renamePackage,
     deletePackage,
     updatePackageTexts,
+    swapWithPrevious,
     setLastPackage,
     getChatState,
     setChatState,
@@ -52,7 +53,7 @@ import {
     hasEnabledModules,
     buildMessages,
 } from './prompt.js';
-import { requestCompletion, parsePackage, reviewPackage, errorText, EmptyResponseError } from './generate.js';
+import { requestCompletion, parsePackage, reviewPackage, cleanPairs, splitBlacklist, errorText, EmptyResponseError } from './generate.js';
 
 // Пакеты, над которыми модель работает прямо сейчас: id → фаза
 // ('generate' — пишет пакет, 'review' — проверяет). Живёт вне окна: если
@@ -240,6 +241,10 @@ function dialogHtml() {
                         <i class="fa-solid fa-list-check"></i>
                         <span>Проверить пакет</span>
                     </button>
+                    <button type="button" class="menu_button rlw-check rlw-undo" title="Вернуть текст, который был до последней генерации или проверки. Нажмёшь ещё раз — вернётся обратно.">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <span>Вернуть прошлую версию</span>
+                    </button>
                 </div>
 
                 <div class="rlw-field">
@@ -308,7 +313,7 @@ function canGenerate(pkg) {
 /** Проверки до ручной самопроверки. */
 function canReview(pkg) {
     if (!pkg) return false;
-    if (!getSettings().profileId) {
+    if (!getSettings().reviewProfileId && !getSettings().profileId) {
         toastr.warning('Не выбран профиль подключения — загляни в настройки Realmweaver.', 'Realmweaver');
         return false;
     }
@@ -339,6 +344,12 @@ async function generatePackage(pkgId) {
 
         const raw = await requestCompletion(buildMessages(pkg, text));
         let { full, cheat } = parsePackage(raw);
+        // Мусорные пары (X → X, «нет замены», повторы) чистим кодом сразу.
+        {
+            const { body, blacklist } = splitBlacklist(full);
+            full = [body, cleanPairs(blacklist)].filter(Boolean).join('\n\n');
+            cheat = cleanPairs(cheat);
+        }
 
         // Самопроверка: второй запрос, модель-редактор чинит пакет по чек-листу.
         // Если он упал — сохраняем то, что получилось на первом проходе.
@@ -353,7 +364,7 @@ async function generatePackage(pkgId) {
         }
 
         if (!getPackage(pkgId)) return; // пакет удалили, пока ждали ответа
-        updatePackageTexts(pkgId, { full, cheat });
+        updatePackageTexts(pkgId, { full, cheat }, { keepPrevious: true });
         applyInjection();
 
         if (!cheat) toastr.warning('Шпаргалку модель не выдала — допиши руками или перегенерируй.', 'Realmweaver');
@@ -379,7 +390,7 @@ async function checkPackage(pkgId) {
     try {
         const { full, cheat } = await reviewPackage(pkg, pkg.full, pkg.cheat);
         if (!getPackage(pkgId)) return;
-        updatePackageTexts(pkgId, { full, cheat });
+        updatePackageTexts(pkgId, { full, cheat }, { keepPrevious: true });
         applyInjection();
         toastr.success(`Пакет «${getPackage(pkgId).name}» проверен.`, 'Realmweaver');
     } catch (error) {
@@ -666,7 +677,8 @@ export async function openWorkshop() {
         const busyLabel = phase === 'review' ? 'Проверяю…' : 'Генерирую…';
         $button.find('.rlw-generate-label').text(busy ? busyLabel : (hasText ? 'Перегенерировать' : 'Сгенерировать пакет'));
         // «Проверить пакет» — только когда есть что проверять.
-        $root.find('.rlw-check').toggle(hasFull || busy).prop('disabled', busy);
+        $root.find('.rlw-check:not(.rlw-undo)').toggle(hasFull || busy).prop('disabled', busy);
+        $root.find('.rlw-undo').toggle(Boolean(pkg?.previous)).prop('disabled', busy);
         // Пока модель работает, поля только для чтения — иначе правки затрёт результат.
         $root.find('.rlw-text').prop('readonly', busy);
     };
@@ -841,7 +853,7 @@ export async function openWorkshop() {
         generatePackage(pkg.id);
     });
 
-    $root.on('click', '.rlw-check', async () => {
+    $root.on('click', '.rlw-check:not(.rlw-undo)', async () => {
         const pkg = getPackage(selectedId);
         if (!pkg || busyPackages.has(pkg.id)) return;
         // Проверяем то, что в полях: несохранённые правки сначала сохраняем (или выбрасываем).
@@ -849,6 +861,17 @@ export async function openWorkshop() {
         if (!canReview(pkg)) return;
         awaitedId = pkg.id;
         checkPackage(pkg.id);
+    });
+
+    $root.on('click', '.rlw-undo', async () => {
+        const pkg = getPackage(selectedId);
+        if (!pkg?.previous || busyPackages.has(pkg.id)) return;
+        await resolveDirty();
+        swapWithPrevious(pkg.id);
+        applyInjection();
+        renderTexts();
+        renderStatus();
+        toastr.info('Вернул прошлую версию. Нажми ещё раз, чтобы вернуть обратно.', 'Realmweaver');
     });
 
     $root.on('input', '.rlw-text', function () {

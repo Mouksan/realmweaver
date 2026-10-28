@@ -44,12 +44,11 @@ function getConnectionProfiles() {
 }
 
 /** Перерисовывает список профилей — профили могут появиться/исчезнуть, пока таверна открыта. */
-function renderProfileOptions() {
-    const selectedId = getSettings().profileId;
+function profileOptionsHtml(selectedId, emptyLabel) {
     const profiles = getConnectionProfiles().filter((p) => p?.id);
     const known = profiles.some((p) => p.id === selectedId);
 
-    const options = [`<option value="" ${selectedId ? '' : 'selected'}>— не выбран —</option>`];
+    const options = [`<option value="" ${selectedId ? '' : 'selected'}>${escapeHtml(emptyLabel)}</option>`];
     for (const p of profiles) {
         options.push(`<option value="${escapeHtml(p.id)}" ${p.id === selectedId ? 'selected' : ''}>${escapeHtml(p.name || p.id)}</option>`);
     }
@@ -57,7 +56,12 @@ function renderProfileOptions() {
     if (selectedId && !known) {
         options.push(`<option value="${escapeHtml(selectedId)}" selected>(профиль не найден)</option>`);
     }
-    $('#rlw_profile').html(options.join(''));
+    return options.join('');
+}
+
+function renderProfileOptions() {
+    $('#rlw_profile').html(profileOptionsHtml(getSettings().profileId, '— не выбран —'));
+    $('#rlw_review_profile').html(profileOptionsHtml(getSettings().reviewProfileId, 'Тот же, что для генерации'));
 }
 
 // ---------------------------------------------------------------------------
@@ -102,6 +106,12 @@ function settingsHtml() {
                             <span>Самопроверка пакета</span>
                         </label>
                         <div class="rlw-hint">После генерации модель перечитывает пакет по чек-листу и исправляет нарушения. Это ещё один запрос, генерация займёт примерно вдвое дольше.</div>
+
+                        <div class="rlw-set-field">
+                            <label for="rlw_review_profile">Профиль для проверки</label>
+                            <select id="rlw_review_profile" class="text_pole"></select>
+                            <div class="rlw-hint">Можно проверять другой моделью — например, писать Опусом, а вычитывать Гемини.</div>
+                        </div>
 
                         <div class="rlw-set-field rlw-set-field--short">
                             <label for="rlw_cheat_depth">Глубина шпаргалки</label>
@@ -167,6 +177,11 @@ function mountSettings() {
     $('#rlw_profile').on('focus', renderProfileOptions);
     $('#rlw_profile').on('change', function () {
         getSettings().profileId = String($(this).val() || '');
+        saveSettings();
+    });
+    $('#rlw_review_profile').on('focus', renderProfileOptions);
+    $('#rlw_review_profile').on('change', function () {
+        getSettings().reviewProfileId = String($(this).val() || '');
         saveSettings();
     });
 

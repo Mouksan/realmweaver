@@ -376,22 +376,22 @@ How to work:
 
 function reviewChecklistLines(language) {
     const church = language === 'ru'
-        ? 'заутреня, утреня, вечерня, повечерие, постный день, воскресение, отче'
-        : 'matins, vespers, compline, Sabbath, Lent';
+        ? 'заутреня, утреня, вечерня, повечерие, постный день, воскресение, отче, святотатство'
+        : 'matins, vespers, compline, Sabbath, Lent, sacrilege';
     const disguised = language === 'ru'
-        ? 'Октарис ← октябрь, Генварис ← январь/генварь, Декларис ← декабрь'
-        : 'Octaris ← October, Decembris ← December, Sunsday ← Sunday';
+        ? 'Октарис ← октябрь, Новарис ← ноябрь, Генварис ← январь/генварь, «день Солнца» ← воскресенье'
+        : 'Octaris ← October, Novaris ← November, "Sun-day" ← Sunday';
     return [
         '# CHECKLIST — go through every item',
-        'Note: the LEFT side of blacklist and cheat-sheet pairs is SUPPOSED to hold words from our world (Господи, рубль, минута…) — that is what the pairs replace. Never "fix" the left side; check only the right side and the rest of the package.',
-        `1. Church or liturgical vocabulary (${church}) — replace with in-world terms everywhere, including the cheat sheet.`,
-        `2. Our months, weekdays or holidays in disguise (${disguised}) — rename them by the naming rules, consistently in every section and in the cheat sheet.`,
-        '3. Our units, comparisons with our units, the word "our", references to our world (Europe, centuries, the New World, real countries, real crops "not yet brought") — remove or rewrite in-world terms.',
-        '4. Internal arithmetic: units of time, distance, weight and money must agree with each other in every section and in the cheat sheet. Check durations against what they describe (if three sand-turns make one bell-interval, a body process cannot last fifteen sand-turns). Fix contradictory numbers.',
-        '5. One spelling per name throughout the package; fix typos and variant spellings.',
-        '6. The blacklist: remove duplicate pairs, bare bans (no replacement), non-pairs (X → X), nonsensical pairs, and any pair with foreign-language words; profanity must never appear in the pairs.',
-        '7. No original-language glosses in parentheses, no meta-commentary.',
-        '8. Size limits below: if the package is over them, trim the least useful items. Never drop a whole section.',
+        `1. Church or liturgical vocabulary (${church}) — replace with in-world terms everywhere.`,
+        `2. Our months, weekdays or holidays in disguise (${disguised}) — rename them by the naming rules, consistently everywhere.`,
+        '3. Real names from our world: our coins (денарий, солид, ауреус, талер, грош), our units, comparisons with our units, the word "our", references to our geography and history (Europe, centuries, the New World, real countries) — rewrite in-world.',
+        '4. KEEP the lists of what does not exist in this world ("no gunpowder", "no printing", "no potatoes, no maize") — they are valuable. Only strip from them phrases that name our world (e.g. "they were not yet in Europe").',
+        '5. Anachronisms in the world itself (chocolate, injections, glasses, forks in a medieval world, etc.) — replace with something that fits the technology level.',
+        '6. Internal arithmetic: units of time, distance, weight and money must agree with each other everywhere, including the cheat-sheet summary. Check durations against what they describe (if three sand-turns make one bell-interval, a body process cannot last fifteen sand-turns). Fix contradictory numbers.',
+        '7. One spelling per name throughout; fix typos and variant spellings.',
+        '8. No original-language glosses in parentheses, no meta-commentary.',
+        '9. Size limits below: if over them, trim the least useful items. Never drop a whole section.',
     ];
 }
 
@@ -404,6 +404,7 @@ export function buildReviewMessages(pkg, full, cheat) {
 
     const lines = [];
     lines.push('# PACKAGE TO REVIEW', '', '<full>', String(full || '').trim(), '</full>', '<cheat>', String(cheat || '').trim(), '</cheat>', '');
+    lines.push('The blacklist section and the replacement pairs of the cheat sheet are handled separately and are NOT part of this review. <cheat> above holds only the summary lines (units of time, distance, money).', '');
     lines.push('# CONTEXT');
     lines.push(`- Roleplay language: ${languageName}`);
     for (const param of PARAMS) lines.push(paramLine(param, params));
@@ -418,9 +419,9 @@ export function buildReviewMessages(pkg, full, cheat) {
     lines.push(...reviewChecklistLines(language));
     lines.push('');
     lines.push('# OUTPUT FORMAT');
-    lines.push('Reply with exactly two blocks and nothing outside them: the corrected <full>…</full> and the corrected <cheat>…</cheat>.');
+    lines.push('Reply with exactly two blocks and nothing outside them: the corrected <full>…</full> (without a blacklist section) and the corrected <cheat>…</cheat> (only the summary lines, no replacement pairs).');
     lines.push('');
-    lines.push(...sizeRuleLines(language, modules));
+    lines.push(...sizeRuleLines(language, modules).slice(0, 3));
 
     return [
         { role: 'system', content: REVIEW_INSTRUCTIONS },

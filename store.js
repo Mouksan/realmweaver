@@ -31,6 +31,8 @@ const DEFAULTS = {
     promptTemplate: '',
     // Самопроверка пакета вторым запросом после генерации (по умолчанию выключена).
     selfCheck: false,
+    // Профиль для самопроверки; пусто — тот же, что для генерации.
+    reviewProfileId: '',
     packages: {},
     bindings: {},
     lastPackageId: '',
@@ -119,6 +121,19 @@ export function createPackage(name) {
     return pkg;
 }
 
+/** Меняет местами текущую и прошлую версию — повторное нажатие вернёт обратно. */
+export function swapWithPrevious(id) {
+    const pkg = getPackage(id);
+    if (!pkg?.previous) return null;
+    const current = { full: String(pkg.full || ''), cheat: String(pkg.cheat || ''), savedAt: Date.now() };
+    pkg.full = pkg.previous.full;
+    pkg.cheat = pkg.previous.cheat;
+    pkg.previous = current;
+    pkg.updatedAt = Date.now();
+    saveSettings();
+    return pkg;
+}
+
 export function renamePackage(id, name) {
     const pkg = getPackage(id);
     const clean = String(name || '').trim();
@@ -129,9 +144,17 @@ export function renamePackage(id, name) {
     return pkg;
 }
 
-export function updatePackageTexts(id, { full, cheat }) {
+/**
+ * keepPrevious: перед перезаписью запомнить текущий текст как «прошлую
+ * версию» (для кнопки отката). Ставится при генерации и проверке, но не при
+ * ручном сохранении правок.
+ */
+export function updatePackageTexts(id, { full, cheat }, { keepPrevious = false } = {}) {
     const pkg = getPackage(id);
     if (!pkg) return null;
+    if (keepPrevious && (String(pkg.full || '').trim() || String(pkg.cheat || '').trim())) {
+        pkg.previous = { full: String(pkg.full || ''), cheat: String(pkg.cheat || ''), savedAt: Date.now() };
+    }
     if (typeof full === 'string') pkg.full = full;
     if (typeof cheat === 'string') pkg.cheat = cheat;
     pkg.updatedAt = Date.now();
