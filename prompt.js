@@ -225,6 +225,26 @@ function paramLine(param, params) {
     return `- ${param.promptLabel}: ${option.prompt}`;
 }
 
+// Звучание выдуманных имён — под архетип. Кириллицей, но нездешнее: если
+// просить модель «придумывать по-русски», она лезет в славянские корни и
+// церковную лексику (Студень, Заутреня) — ровно те русизмы, с которыми боремся.
+const NAME_SOUND = {
+    western: { ru: 'Latin- and Romance-sounding (e.g. Ренатис, Солмарис)', en: 'Latin- and Romance-sounding (e.g. Renatis, Solmaris)' },
+    xianxia: { ru: 'Chinese-sounding, in the standard Russian (Palladius) transliteration', en: 'Chinese-sounding, in pinyin' },
+    eastern_court: { ru: 'Japanese- or Korean-sounding, in the standard Russian transliteration', en: 'Japanese- or Korean-sounding' },
+    middle_eastern: { ru: 'Arabic- or Persian-sounding', en: 'Arabic- or Persian-sounding' },
+    slavic: { ru: 'Slavic-sounding — Slavic roots are native in this setting', en: 'Slavic-sounding — Slavic roots are native in this setting' },
+    steampunk: { ru: 'Latin-, Romance- or Germanic-sounding', en: 'Latin-, Romance- or Germanic-sounding' },
+};
+
+function nameSoundLine(params, language) {
+    const preset = NAME_SOUND[params.archetype];
+    if (preset) return preset[language];
+    return language === 'en'
+        ? 'matching the culture that the setting parameters and the sources suggest'
+        : 'matching the culture that the setting parameters and the sources suggest — never Slavic unless the setting is Slavic';
+}
+
 /** Есть ли хоть один включённый модуль. */
 export function hasEnabledModules(pkg) {
     return Object.values(getModules(pkg)).some(Boolean);
@@ -268,14 +288,30 @@ export function buildMessages(pkg, sourcesText) {
     }
     lines.push('');
 
-    lines.push('# LANGUAGE');
+    const slavic = params.archetype === 'slavic';
+    lines.push('# LANGUAGE AND NAMES');
     lines.push(`Write everything inside <full> and <cheat> in ${languageName}, section headers included.`);
-    lines.push(`Every in-world name and term must be ready to use in a ${languageName} roleplay: if the sources spell it in another language (or you invent it), give it in ${languageName} — transliterate names, translate or transliterate terms. Never add original-language glosses in parentheses — not for names, not for terms, not for phrases.`);
+    if (language === 'ru') {
+        if (slavic) {
+            lines.push('- Names and coined terms (places, months, holidays, units, coins, ranks, deities) are written in Cyrillic and sound Slavic — Slavic roots are native in this setting. Names taken from the sources are transliterated into Cyrillic as they sound.');
+            lines.push('- Never borrow church or liturgical vocabulary (заутреня, вечерня, повечерие, постный день, воскресение) — this world has its own faith.');
+        } else {
+            lines.push(`- Names and coined terms (places, months, holidays, units, coins, ranks, deities) are written in Cyrillic but must sound foreign to Russian ears: ${nameSoundLine(params, language)}. Names taken from the sources are transliterated into Cyrillic as they sound.`);
+            lines.push('- Never coin words from Slavic roots (no Студень, Травник, Ледогон-style names) and never borrow church or liturgical vocabulary (заутреня, вечерня, повечерие, постный день, воскресение).');
+        }
+        lines.push('- Plain everyday Russian words for ordinary things (хлеб, свеча, колокол, плащ) are fine — the foreign sound is for names and coined terms.');
+    } else {
+        lines.push(`- Names and coined terms (places, months, holidays, units, coins, ranks, deities) must sound foreign: ${nameSoundLine(params, language)}. Names taken from the sources keep their spelling.`);
+        lines.push('- Never borrow church or liturgical vocabulary (matins, vespers, compline, Sabbath, Lent) for in-world time or customs.');
+    }
+    lines.push('- Never add original-language glosses in parentheses — not for names, not for terms, not for phrases.');
     lines.push('');
 
     lines.push('# WORLD CONSISTENCY');
-    lines.push('- Never convert in-world measures into our units: no centimetres, metres, grams, kilograms, litres or similar, not even in brackets. Define every in-world unit through other in-world things (e.g. a mile is a thousand paces).');
-    lines.push('- Holidays, customs and institutions may echo themes from our world, but never copy their names: give them native in-world names. If the sources already name something, use that name.');
+    lines.push('- Concepts may resemble our pre-modern practice (bells, candles, night watches, market days); only the WORDS must not be ours.');
+    lines.push('- Never measure anything in our units and never compare with them: no centimetres, metres, grams, kilograms, litres, no "about a hundred of our grams" or "half of our hour". Define every in-world unit through other in-world things (e.g. "a thousand paces", "as much as a man drinks at one go").');
+    lines.push('- Holidays, customs and institutions may take a theme from our world, but never its name: give them native in-world names. If the sources already name something, use that name.');
+    lines.push('- No meta-commentary inside the package (no "possibly a typo in the source", no notes to the author).');
     lines.push('');
 
     lines.push('# OUTPUT FORMAT');
@@ -288,6 +324,7 @@ export function buildMessages(pkg, sourcesText) {
     lines.push('</cheat>');
     lines.push('');
     lines.push('<full> is the main reference. Dense rather than long: roughly 800–1500 words.');
+    lines.push('Compact layout inside each section: pack related items into one line, separated by semicolons (e.g. `- Lighting: …; …; …`). No bold sub-headers inside sections, no one-word lines.');
     const cheatUnits = modules.time ? ' and the in-world units of time, distance and money' : '';
     lines.push(`<cheat> sits right next to the latest messages in EVERY request, so keep it tight: at most ~25 lines. Only the replacement pairs most likely to slip (\`- X → Y\`)${cheatUnits}. Never put profanity into the replacement pairs. No headers, no explanations.`);
 
