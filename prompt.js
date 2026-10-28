@@ -327,7 +327,9 @@ export function buildMessages(pkg, sourcesText) {
     lines.push('</cheat>');
     lines.push('');
     lines.push('SIZE LIMITS — they are strict:');
-    lines.push(`- <full>: about 3,000 tokens in total (${language === 'ru' ? 'roughly 1,000–1,200 Russian words' : 'roughly 2,000 English words'}). Density over length.`);
+    // Модели не умеют считать свои токены и стабильно перебирают планку
+    // примерно в полтора раза — поэтому просим ~2000, чтобы приземлялось около 3000.
+    lines.push(`- <full>: about 2,000 tokens in total (${language === 'ru' ? 'roughly 700–800 Russian words' : 'roughly 1,400 English words'}). Density over length.`);
     lines.push('- Every section: at most ~10 bullet lines. Each line is a topic label plus 3–6 related items separated by semicolons (e.g. `- Lighting: …; …; …`). No one-word or two-word lines, no bold sub-headers inside sections.');
     lines.push('- The blacklist: at most ~30 pairs in total, grouped by kind, 3–5 pairs per line separated by semicolons (e.g. `- Faith: Господи → …; ей-богу → …; слава богу → …`).');
     const cheatUnits = modules.time ? ' and the in-world units of time, distance and money' : '';
